@@ -12,12 +12,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
 import { ModalHeader } from '@/components/ModalHeader';
-import { Card, Row, SectionTitle, Txt } from '@/components/ui';
+import { Card, Chip, Row, SectionTitle, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
-import { searchProducts, type OffProduct } from '@/lib/openfoodfacts';
+import { searchProducts, WELL_DOCUMENTED, type OffProduct } from '@/lib/openfoodfacts';
 import type { Meal } from '@/store/types';
 import { recentFoods, useAppStore } from '@/store/useAppStore';
 
@@ -37,6 +37,7 @@ export default function AddScreen() {
   const [results, setResults] = useState<OffProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onlyComplete, setOnlyComplete] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -72,6 +73,13 @@ export default function AddScreen() {
   }, [query]);
 
   const showRecents = query.trim().length < 3;
+
+  // Filtre optionnel : les fiches à peine renseignées noient les bonnes.
+  const visible = useMemo(
+    () => (onlyComplete ? results.filter((p) => (p.completeness ?? 0) >= WELL_DOCUMENTED) : results),
+    [results, onlyComplete],
+  );
+  const hidden = results.length - visible.length;
 
   return (
     <View style={{ flex: 1, paddingTop: topInset }}>
@@ -131,7 +139,7 @@ export default function AddScreen() {
       </View>
 
       <FlatList
-        data={showRecents ? [] : results}
+        data={showRecents ? [] : visible}
         keyExtractor={(item, i) => `${item.barcode}-${i}`}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
@@ -193,6 +201,20 @@ export default function AddScreen() {
             <Txt variant="caption" color={t.danger} style={{ marginBottom: Spacing.three }}>
               {error}
             </Txt>
+          ) : results.length > 0 ? (
+            <Row
+              gap={Spacing.three}
+              style={{ marginBottom: Spacing.three, justifyContent: 'space-between' }}>
+              <Chip
+                label="Fiches complètes"
+                selected={onlyComplete}
+                onPress={() => setOnlyComplete((v) => !v)}
+              />
+              <Txt variant="caption" muted>
+                {visible.length} résultat{visible.length > 1 ? 's' : ''}
+                {onlyComplete && hidden > 0 ? ` · ${hidden} masqué${hidden > 1 ? 's' : ''}` : ''}
+              </Txt>
+            </Row>
           ) : null
         }
         ListEmptyComponent={
@@ -234,12 +256,37 @@ export default function AddScreen() {
                 {item.brand ? `${item.brand} · ` : ''}
                 {item.kcalPer100} kcal · {item.proteinPer100} g prot. / 100 {item.baseUnit}
               </Txt>
+              <Quality product={item} />
             </View>
             <Icon name="chevronRight" size={16} color={t.textSecondary} />
           </Pressable>
         )}
       />
     </View>
+  );
+}
+
+/**
+ * Signal de fiabilité d'une fiche OpenFoodFacts. La base est contributive :
+ * beaucoup de fiches n'ont qu'un nom et une valeur énergétique saisis à la
+ * hâte, d'autres sont relues par des milliers de scans.
+ */
+function Quality({ product }: { product: OffProduct }) {
+  const t = useTheme();
+  const complete = (product.completeness ?? 0) >= WELL_DOCUMENTED;
+  const scans = product.scans ?? 0;
+
+  const color = complete ? t.proteinDone : t.textSecondary;
+  const label = complete ? 'fiche complète' : 'fiche peu renseignée';
+
+  return (
+    <Row gap={Spacing.one} style={{ marginTop: 2 }}>
+      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
+      <Txt variant="caption" color={color} style={{ fontSize: 10 }}>
+        {label}
+        {scans > 0 ? ` · ${scans} scan${scans > 1 ? 's' : ''}` : ''}
+      </Txt>
+    </Row>
   );
 }
 

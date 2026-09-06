@@ -150,11 +150,18 @@ export default function StatsScreen() {
         </View>
       </Card>
 
-      {/* Moyennes, calculées sur les seuls jours renseignés */}
-      <Row gap={Spacing.three} style={{ alignItems: 'stretch' }}>
-        <Tile label="Moyenne de la semaine" value={avgKcal} unit="kcal" />
-        <Tile label="Moyenne protéines" value={avgProtein} unit="g" />
-      </Row>
+      {/* Moyennes, calculées sur les seuls jours renseignés de la semaine */}
+      <View style={{ gap: Spacing.three }}>
+        <SectionTitle>Moyenne de la semaine</SectionTitle>
+        <Row gap={Spacing.three} style={{ alignItems: 'stretch' }}>
+          <Tile label="Calories" value={avgKcal} unit="kcal" />
+          <Tile label="Protéines" value={avgProtein} unit="g" />
+        </Row>
+        <Txt variant="caption" muted>
+          Calculée sur {logged.length} jour{logged.length > 1 ? 's' : ''} renseigné
+          {logged.length > 1 ? 's' : ''}, pas sur 7.
+        </Txt>
+      </View>
 
       {logged.length === 0 ? (
         <Card style={{ alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.six }}>
