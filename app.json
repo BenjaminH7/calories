@@ -9,12 +9,17 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.benjamin.kcal",
       "supportsTablet": true,
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.benjamin.kcal"]
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "La caméra sert uniquement à lire les codes-barres des aliments. Aucune image n'est enregistrée."
       }
     },
     "android": {
+      "package": "com.benjamin.kcal",
       "adaptiveIcon": {
         "backgroundColor": "#F6F6F4",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -31,6 +36,7 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
+      "@bacons/apple-targets",
       [
         "expo-camera",
         {
