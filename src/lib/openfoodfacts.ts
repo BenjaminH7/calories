@@ -10,10 +10,12 @@ const FIELDS = [
   'code',
   'product_name',
   'product_name_fr',
+  'product_name_en',
   'generic_name_fr',
   'brands',
   'image_front_small_url',
   'image_small_url',
+  'image_url',
   'quantity',
   'serving_size',
   'serving_quantity',
@@ -43,13 +45,27 @@ function num(value: unknown): number | undefined {
   return typeof n === 'number' && Number.isFinite(n) ? n : undefined;
 }
 
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
 function pickName(p: RawProduct): string {
   return (
-    p.product_name_fr?.trim() ||
-    p.product_name?.trim() ||
-    p.generic_name_fr?.trim() ||
+    text(p.product_name_fr) ??
+    text(p.product_name) ??
+    text(p.product_name_en) ??
+    text(p.generic_name_fr) ??
     'Produit sans nom'
   );
+}
+
+/**
+ * `brands` change de forme selon l'endpoint : chaîne « Marque1,Marque2 » via
+ * l'API produit, tableau via search-a-licious. On accepte les deux.
+ */
+function pickBrand(value: unknown): string | undefined {
+  if (Array.isArray(value)) return text(value[0]);
+  return text(text(value)?.split(',')[0]);
 }
 
 /** OFF stocke l'énergie en kJ quand les kcal manquent : on convertit. */
@@ -65,20 +81,29 @@ export function parseProduct(p: RawProduct): OffProduct | null {
   const kcal = energyKcal(n);
   if (kcal === undefined) return null;
 
-  const quantityText: string = `${p.quantity ?? ''} ${p.serving_size ?? ''}`.toLowerCase();
+  const quantityText = `${text(p.quantity) ?? ''} ${text(p.serving_size) ?? ''}`.toLowerCase();
   const baseUnit: 'g' | 'ml' = /\bml\b|\bcl\b|\bl\b|litre/.test(quantityText) ? 'ml' : 'g';
 
   return {
     barcode: String(p.code ?? ''),
     name: pickName(p),
-    brand: p.brands?.split(',')[0]?.trim() || undefined,
-    imageUrl: p.image_front_small_url ?? p.image_small_url ?? undefined,
+    brand: pickBrand(p.brands),
+    imageUrl: text(p.image_front_small_url) ?? text(p.image_small_url) ?? text(p.image_url),
     kcalPer100: Math.round(kcal * 10) / 10,
     proteinPer100: Math.round((num(n.proteins_100g) ?? num(n.proteins) ?? 0) * 10) / 10,
     baseUnit,
     servingSize: num(p.serving_quantity),
-    servingLabel: p.serving_size?.trim() || undefined,
+    servingLabel: text(p.serving_size),
   };
+}
+
+/** Un produit mal formé ne doit jamais faire échouer toute la recherche. */
+function safeParse(p: RawProduct): OffProduct | null {
+  try {
+    return parseProduct(p);
+  } catch {
+    return null;
+  }
 }
 
 async function offFetch(url: string, signal?: AbortSignal) {
@@ -111,7 +136,7 @@ export async function searchProducts(query: string, signal?: AbortSignal): Promi
     `&page_size=50&fields=${FIELDS}`;
   const json = await offFetch(url, signal);
   const products: RawProduct[] = json?.hits ?? [];
-  return products.map(parseProduct).filter((p): p is OffProduct => p !== null && p.kcalPer100 > 0);
+  return products.map(safeParse).filter((p): p is OffProduct => p !== null && p.kcalPer100 > 0);
 }
 
 /** Convertit un produit OFF en base de calcul pour une unité de saisie. */

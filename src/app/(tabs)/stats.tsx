@@ -19,6 +19,9 @@ import {
 import { effectiveCalorieGoal } from '@/lib/nutrition';
 import { totalsForDay, useAppStore } from '@/store/useAppStore';
 
+/** Hauteur de la zone des barres. */
+const CHART_HEIGHT = 150;
+
 type DayStat = {
   day: DayKey;
   kcal: number;
@@ -99,65 +102,52 @@ export default function StatsScreen() {
       <Card style={{ gap: Spacing.four }}>
         {/* Barres et initiales des jours forment un bloc : elles se touchent. */}
         <View style={{ gap: Spacing.two }}>
-        <View style={{ height: 150, justifyContent: 'flex-end' }}>
-          {/* Ligne d'objectif */}
-          <View
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: (calorieGoal / scale) * 150,
-              height: StyleSheet.hairlineWidth * 2,
-              backgroundColor: t.border,
-            }}
-          />
+          <View style={{ height: CHART_HEIGHT, justifyContent: 'flex-end' }}>
+            <Row gap={Spacing.two} style={{ alignItems: 'flex-end', height: '100%' }}>
+              {days.map((d) => {
+                const over = d.kcal > d.goal;
+                const height = d.logged ? Math.max((d.kcal / scale) * CHART_HEIGHT, 6) : 4;
+                return (
+                  <View key={d.day} style={{ flex: 1, alignItems: 'center', gap: Spacing.one }}>
+                    {d.logged ? (
+                      <Txt
+                        variant="caption"
+                        color={over ? t.danger : t.textSecondary}
+                        style={{ fontSize: 10 }}>
+                        {Math.round(d.kcal)}
+                      </Txt>
+                    ) : null}
+                    <View
+                      style={{
+                        width: '78%',
+                        height,
+                        borderRadius: Radius.sm,
+                        backgroundColor: !d.logged
+                          ? t.ringTrack
+                          : over
+                            ? t.danger
+                            : t.proteinDone,
+                        opacity: d.future ? 0.4 : 1,
+                      }}
+                    />
+                  </View>
+                );
+              })}
+            </Row>
+          </View>
 
-          <Row gap={Spacing.two} style={{ alignItems: 'flex-end', height: '100%' }}>
-            {days.map((d) => {
-              const over = d.kcal > d.goal;
-              const height = d.logged ? Math.max((d.kcal / scale) * 150, 6) : 4;
-              return (
-                <View key={d.day} style={{ flex: 1, alignItems: 'center', gap: Spacing.one }}>
-                  {d.logged ? (
-                    <Txt variant="caption" muted style={{ fontSize: 9 }}>
-                      {Math.round(d.kcal)}
-                    </Txt>
-                  ) : null}
-                  <View
-                    style={{
-                      width: '78%',
-                      height,
-                      borderRadius: Radius.sm,
-                      backgroundColor: !d.logged
-                        ? t.ringTrack
-                        : over
-                          ? t.danger
-                          : t.proteinDone,
-                      opacity: d.future ? 0.4 : 1,
-                    }}
-                  />
-                </View>
-              );
-            })}
+          <Row gap={Spacing.two}>
+            {days.map((d) => (
+              <Txt
+                key={d.day}
+                variant="caption"
+                muted
+                style={{ flex: 1, textAlign: 'center', fontSize: 10 }}>
+                {weekdayLetter(d.day)}
+              </Txt>
+            ))}
           </Row>
         </View>
-
-        <Row gap={Spacing.two}>
-          {days.map((d) => (
-            <Txt
-              key={d.day}
-              variant="caption"
-              muted
-              style={{ flex: 1, textAlign: 'center', fontSize: 10 }}>
-              {weekdayLetter(d.day)}
-            </Txt>
-          ))}
-        </Row>
-        </View>
-
-        <Txt variant="caption" muted>
-          Le trait horizontal marque ton objectif de {calorieGoal} kcal.
-        </Txt>
       </Card>
 
       {/* Moyennes, calculées sur les seuls jours renseignés */}
