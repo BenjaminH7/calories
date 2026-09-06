@@ -12,10 +12,14 @@
       "bundleIdentifier": "com.benjamin.kcal",
       "supportsTablet": true,
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.benjamin.kcal"]
+        "com.apple.security.application-groups": [
+          "group.com.benjamin.kcal",
+          "group.com.benjamin.kcal"
+        ]
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "La caméra sert uniquement à lire les codes-barres des aliments. Aucune image n'est enregistrée."
+        "NSCameraUsageDescription": "La caméra sert uniquement à lire les codes-barres des aliments. Aucune image n'est enregistrée.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -27,7 +31,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -55,6 +62,29 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.benjamin.kcal.widget",
+                  "targetName": "KcalWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.benjamin.kcal"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "ce64c8d8-e3ab-481e-b170-b46f18361ff9"
+      }
     }
   }
 }
