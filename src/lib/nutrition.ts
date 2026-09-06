@@ -175,6 +175,30 @@ export function calorieStreak(
   return streak;
 }
 
+/**
+ * Plancher de sécurité pour l'objectif ajusté par les événements : en dessous,
+ * un déficit prolongé devient dangereux pour la plupart des adultes.
+ */
+export const MIN_SAFE_DAILY_CALORIES = 1200;
+
+/**
+ * Baisse maximale autorisée par rapport à l'objectif de base : un plancher
+ * absolu seul est trop laxiste pour un gros objectif (25 % de moins sur
+ * 3000 kcal reste énorme) et trop strict pour un petit objectif déjà proche
+ * du minimum. On applique donc le plus restrictif des deux.
+ */
+export const MAX_EVENT_REDUCTION_RATIO = 0.25;
+
+/**
+ * Plancher réel pour un objectif de base donné : jamais au-dessus de
+ * l'objectif lui-même — les événements ne doivent qu'empêcher de descendre
+ * plus bas, jamais forcer une hausse.
+ */
+export function safeGoalFloor(baseGoal: number): number {
+  const percentFloor = baseGoal * (1 - MAX_EVENT_REDUCTION_RATIO);
+  return Math.min(baseGoal, Math.max(MIN_SAFE_DAILY_CALORIES, percentFloor));
+}
+
 /** Objectif calorique effectif du jour, épargne comprise. */
 export function effectiveCalorieGoal(
   baseGoal: number,
@@ -182,6 +206,7 @@ export function effectiveCalorieGoal(
   day: DayKey,
 ): { goal: number; adjustment: DayAdjustment } {
   const adjustment = adjustmentsFor(events, day);
-  const goal = Math.max(0, baseGoal - adjustment.saved + adjustment.released);
+  const floor = safeGoalFloor(baseGoal);
+  const goal = Math.max(floor, baseGoal - adjustment.saved + adjustment.released);
   return { goal, adjustment };
 }

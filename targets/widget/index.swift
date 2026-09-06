@@ -116,27 +116,64 @@ struct Bar: View {
   }
 }
 
-struct CaloriesBlock: View {
+/// Anneau des calories restantes, même logique visuelle que `CalorieRing.tsx`
+/// côté app : arc rempli à hauteur du pourcentage consommé, rouge en dépassement.
+struct CalorieRingView: View {
+  let snapshot: Snapshot
+  var size: CGFloat
+  var strokeWidth: CGFloat = 12
+
+  var body: some View {
+    let color = snapshot.isOver ? Color.red : Color.primary
+
+    ZStack {
+      Circle()
+        .stroke(Color.primary.opacity(0.1), lineWidth: strokeWidth)
+
+      Circle()
+        .trim(from: 0, to: snapshot.calorieRatio)
+        .stroke(color, style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
+        .rotationEffect(.degrees(-90))
+
+      VStack(spacing: 1) {
+        Text("\(abs(snapshot.caloriesRemaining))")
+          .font(.system(size: size * 0.26, weight: .heavy, design: .rounded))
+          .minimumScaleFactor(0.5)
+          .lineLimit(1)
+          .foregroundStyle(color)
+
+        Text(snapshot.isOver ? "kcal en trop" : "kcal restantes")
+          .font(.system(size: max(size * 0.075, 9), weight: .semibold, design: .rounded))
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+          .lineLimit(2)
+          .minimumScaleFactor(0.7)
+          .frame(maxWidth: size * 0.7)
+      }
+    }
+    .frame(width: size, height: size)
+  }
+}
+
+/// Ligne compacte protéines, utilisée sous l'anneau (petit widget).
+struct ProteinCompact: View {
   let snapshot: Snapshot
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 2) {
-      Text(snapshot.isOver ? "EN TROP" : "RESTANT")
-        .font(.system(size: 10, weight: .bold, design: .rounded))
+    HStack(spacing: 5) {
+      Text("PROT.")
+        .font(.system(size: 9, weight: .bold, design: .rounded))
         .foregroundStyle(.secondary)
 
-      Text("\(abs(snapshot.caloriesRemaining))")
-        .font(.system(size: 34, weight: .heavy, design: .rounded))
-        .minimumScaleFactor(0.6)
-        .lineLimit(1)
-        .foregroundStyle(snapshot.isOver ? Color.red : Color.primary)
+      Text("\(Int(snapshot.proteinConsumed))/\(snapshot.proteinGoal) g")
+        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .foregroundStyle(snapshot.proteinDone ? Color.green : Color.primary)
 
-      Text("kcal sur \(snapshot.caloriesGoal)")
-        .font(.system(size: 11, weight: .medium, design: .rounded))
-        .foregroundStyle(.secondary)
-
-      Bar(ratio: snapshot.calorieRatio, color: snapshot.isOver ? .red : .primary)
-        .padding(.top, 4)
+      if snapshot.proteinDone {
+        Image(systemName: "checkmark.circle.fill")
+          .font(.system(size: 10))
+          .foregroundStyle(.green)
+      }
     }
   }
 }
@@ -186,12 +223,16 @@ struct SmallView: View {
   let snapshot: Snapshot
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      CaloriesBlock(snapshot: snapshot)
-      Spacer(minLength: 0)
-      ProteinBlock(snapshot: snapshot)
+    GeometryReader { geo in
+      VStack(spacing: 8) {
+        CalorieRingView(
+          snapshot: snapshot,
+          size: min(geo.size.width, geo.size.height - 24)
+        )
+        ProteinCompact(snapshot: snapshot)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
     .widgetURL(URL(string: "kcal:///add/scan"))
   }
 }
@@ -200,9 +241,15 @@ struct MediumView: View {
   let snapshot: Snapshot
 
   var body: some View {
-    HStack(alignment: .top, spacing: 16) {
-      CaloriesBlock(snapshot: snapshot)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    HStack(alignment: .center, spacing: 20) {
+      GeometryReader { geo in
+        CalorieRingView(
+          snapshot: snapshot,
+          size: min(geo.size.width, geo.size.height)
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+      .frame(maxWidth: .infinity)
 
       VStack(alignment: .leading, spacing: 12) {
         ProteinBlock(snapshot: snapshot)

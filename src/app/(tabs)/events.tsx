@@ -8,7 +8,7 @@ import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { daysBetween, humanDay, shortDate, today } from '@/lib/date';
-import { adjustmentsFor, dailySaving, savedSoFar, savingStart } from '@/lib/nutrition';
+import { adjustmentsFor, dailySaving, effectiveCalorieGoal, savedSoFar, savingStart } from '@/lib/nutrition';
 import type { CalorieEvent } from '@/store/types';
 import { pastEvents, upcomingEvents, useAppStore } from '@/store/useAppStore';
 
@@ -27,6 +27,10 @@ export default function EventsScreen() {
   // Même calcul que l'accueil : seuls les événements dont la fenêtre d'épargne
   // a commencé prélèvent quelque chose aujourd'hui.
   const savedToday = useMemo(() => adjustmentsFor(events, now).saved, [events, now]);
+  const todayGoal = useMemo(
+    () => effectiveCalorieGoal(calorieGoal, events, now).goal,
+    [calorieGoal, events, now],
+  );
 
   // Événements créés mais dont l'épargne n'a pas encore démarré.
   const notStarted = useMemo(
@@ -67,7 +71,7 @@ export default function EventsScreen() {
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <SectionTitle>Objectif du jour</SectionTitle>
-            <Txt variant="title">{Math.max(0, calorieGoal - savedToday)}</Txt>
+            <Txt variant="title">{todayGoal}</Txt>
           </View>
         </Row>
         <Txt variant="caption" muted>

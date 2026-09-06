@@ -8,6 +8,7 @@ import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, daysBetween, humanDay, shortDate, today, type DayKey } from '@/lib/date';
+import { safeGoalFloor } from '@/lib/nutrition';
 import { useAppStore } from '@/store/useAppStore';
 
 const PRESETS = [
@@ -41,8 +42,10 @@ export default function NewEventScreen() {
   const maxSpread = Math.max(1, daysBetween(today(), date));
   const effectiveSpread = Math.min(spread, maxSpread);
   const perDay = Math.round(budget / Math.max(1, effectiveSpread) / 5) * 5;
-  const adjustedGoal = Math.max(0, calorieGoal - perDay);
-  const tooAggressive = perDay > calorieGoal * 0.25;
+  // On ne descend jamais sous ce plancher, même si le budget/l'étalement choisis le voudraient.
+  const safeFloor = safeGoalFloor(calorieGoal);
+  const adjustedGoal = Math.max(safeFloor, calorieGoal - perDay);
+  const isClamped = calorieGoal - perDay < safeFloor;
 
   const dateOptions = useMemo(
     () => Array.from({ length: 60 }, (_, i) => addDays(today(), i + 1)),
@@ -217,10 +220,11 @@ export default function NewEventScreen() {
             </Txt>
             .
           </Txt>
-          {tooAggressive ? (
+          {isClamped ? (
             <Txt variant="caption" color={t.danger}>
-              Ça fait plus de 25 % de ton objectif en moins chaque jour. Étale sur plus de jours ou
-              baisse le budget.
+              Pour rester dans une fourchette saine, ton objectif ne descendra jamais sous{' '}
+              {safeFloor} kcal/jour (au plus 25 % de moins que ton objectif). L&apos;épargne sera un
+              peu plus lente que prévu certains jours.
             </Txt>
           ) : null}
         </Card>
