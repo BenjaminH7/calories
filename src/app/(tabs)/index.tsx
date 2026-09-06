@@ -13,7 +13,7 @@ import { WeekStrip, type DaySummary } from '@/components/WeekStrip';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { daysBetween, humanDay, today, weekEndingAt, type DayKey } from '@/lib/date';
-import { calorieStreak, effectiveCalorieGoal } from '@/lib/nutrition';
+import { calorieStreak, dailyGoal } from '@/lib/nutrition';
 import { MEAL_EMOJI, MEAL_LABELS, MEAL_ORDER, UNIT_LABELS, type FoodEntry } from '@/store/types';
 import { entriesForDay, totalsForDay, useAppStore } from '@/store/useAppStore';
 
@@ -46,9 +46,9 @@ export default function TodayScreen() {
 
   const dayEntries = useMemo(() => entriesForDay(entries, day), [entries, day]);
   const totals = useMemo(() => totalsForDay(entries, day), [entries, day]);
-  const { goal, adjustment } = useMemo(
-    () => effectiveCalorieGoal(calorieGoal, events, day),
-    [calorieGoal, events, day],
+  const { goal, adjustment, debt } = useMemo(
+    () => dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, day),
+    [entries, calorieGoal, events, day],
   );
   const eventDays = useMemo(() => new Set(events.map((e) => e.date)), [events]);
 
@@ -76,7 +76,7 @@ export default function TodayScreen() {
       return {
         day: d,
         kcal: dayTotals.kcal,
-        goal: effectiveCalorieGoal(calorieGoal, events, d).goal,
+        goal: dailyGoal((dd) => totalsForDay(entries, dd).kcal, calorieGoal, events, d).goal,
         hasEntries: dayTotals.kcal > 0,
         hasEvent: eventDays.has(d),
       };
@@ -122,7 +122,7 @@ export default function TodayScreen() {
         <View>
           <Txt variant="title">{humanDay(day)}</Txt>
           <Txt variant="caption" muted>
-            {adjustment.saved > 0
+            {adjustment.saved > 0 || debt > 0
               ? `Objectif ajusté : ${goal} kcal`
               : `Objectif : ${goal} kcal · ${proteinGoal} g de protéines`}
           </Txt>
@@ -159,6 +159,12 @@ export default function TodayScreen() {
             <>
               <View style={{ width: 1, height: 28, backgroundColor: t.border }} />
               <Stat label="Épargné" value={`−${adjustment.saved}`} color={t.saving} />
+            </>
+          )}
+          {debt > 0 && (
+            <>
+              <View style={{ width: 1, height: 28, backgroundColor: t.border }} />
+              <Stat label="Rééquilibrage" value={`−${debt}`} color={t.saving} />
             </>
           )}
         </Row>

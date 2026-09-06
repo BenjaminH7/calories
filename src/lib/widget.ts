@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import { today } from '@/lib/date';
-import { effectiveCalorieGoal } from '@/lib/nutrition';
+import { dailyGoal } from '@/lib/nutrition';
 import { totalsForDay, useAppStore } from '@/store/useAppStore';
 
 /** Doit rester identique à app.json, expo-target.config.js et index.swift. */
@@ -46,8 +46,8 @@ function buildSnapshot(): Snapshot {
 
   return {
     caloriesConsumed: Math.round(totals.kcal),
-    // L'objectif exposé est celui du jour, épargne comprise.
-    caloriesGoal: effectiveCalorieGoal(calorieGoal, events, day).goal,
+    // L'objectif exposé est celui du jour, épargne et dette comprises.
+    caloriesGoal: dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, day).goal,
     proteinConsumed: Math.round(totals.protein * 10) / 10,
     proteinGoal,
     day,

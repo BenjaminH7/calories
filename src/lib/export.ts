@@ -1,5 +1,5 @@
 import { addDays, fromDayKey, today, type DayKey } from '@/lib/date';
-import { ACTIVITY_LABELS, effectiveCalorieGoal, GOAL_LABELS } from '@/lib/nutrition';
+import { ACTIVITY_LABELS, dailyGoal, GOAL_LABELS } from '@/lib/nutrition';
 import {
   MEAL_LABELS,
   MEAL_ORDER,
@@ -8,6 +8,7 @@ import {
   type FoodEntry,
   type Profile,
 } from '@/store/types';
+import { totalsForDay } from '@/store/useAppStore';
 
 export type ExportFormat = 'markdown' | 'json';
 
@@ -74,7 +75,7 @@ function collect(input: ExportInput): DayBundle[] {
 
     return {
       day,
-      goal: effectiveCalorieGoal(input.calorieGoal, input.events, day).goal,
+      goal: dailyGoal((d) => totalsForDay(input.entries, d).kcal, input.calorieGoal, input.events, day).goal,
       kcal: dayEntries.reduce((s, e) => s + e.kcal, 0),
       protein: dayEntries.reduce((s, e) => s + e.protein, 0),
       entries: dayEntries,

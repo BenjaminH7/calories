@@ -5,6 +5,7 @@ import { Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayNumber, today, weekdayLetter, type DayKey } from '@/lib/date';
+import { debtBuffer } from '@/lib/nutrition';
 
 export type DaySummary = {
   day: DayKey;
@@ -22,12 +23,13 @@ type Status = 'empty' | 'future' | 'ok' | 'over';
 function statusOf(summary: DaySummary): Status {
   if (summary.day > today()) return 'future';
   if (!summary.hasEntries) return 'empty';
-  return summary.kcal > summary.goal ? 'over' : 'ok';
+  return summary.kcal > summary.goal + debtBuffer(summary.goal) ? 'over' : 'ok';
 }
 
 /**
  * Bandeau des 7 derniers jours façon Cal AI : un anneau par jour, vert si
- * l'objectif calories est tenu, rouge s'il est dépassé, avec le total dessous.
+ * l'objectif calories est tenu, ambre en cas de vrai dépassement (jamais de
+ * rouge — l'app doit toujours encourager), avec le total dessous.
  */
 export function WeekStrip({
   days,
@@ -42,7 +44,7 @@ export function WeekStrip({
 
   const colorFor = (status: Status) =>
     ({
-      over: t.danger,
+      over: t.saving,
       ok: t.proteinDone,
       empty: t.ringTrack,
       future: t.ringTrack,
@@ -100,7 +102,7 @@ export function WeekStrip({
 
               <Txt
                 variant="caption"
-                color={status === 'over' ? t.danger : t.textSecondary}
+                color={status === 'over' ? t.saving : t.textSecondary}
                 style={{ fontSize: 9.5 }}
                 numberOfLines={1}>
                 {summary.hasEntries ? Math.round(summary.kcal) : '–'}
@@ -112,7 +114,7 @@ export function WeekStrip({
 
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.four }}>
         <Legend color={t.proteinDone} label="objectif tenu" />
-        <Legend color={t.danger} label="dépassé" />
+        <Legend color={t.saving} label="ajusté" />
       </View>
     </View>
   );

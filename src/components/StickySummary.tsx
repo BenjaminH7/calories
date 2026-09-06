@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { debtBuffer } from '@/lib/nutrition';
 
 /**
  * Bandeau fin collé en haut, révélé quand l'anneau des calories sort de
@@ -29,7 +30,7 @@ export function StickySummary({
   const insets = useSafeAreaInsets();
 
   const kcalLeft = goal - consumed;
-  const over = kcalLeft < 0;
+  const over = consumed > goal + debtBuffer(goal);
   const proteinLeft = Math.max(0, proteinGoal - protein);
   const proteinDone = proteinGoal > 0 && protein >= proteinGoal;
 
@@ -56,8 +57,8 @@ export function StickySummary({
       <Metric
         value={Math.abs(Math.round(kcalLeft))}
         unit="kcal"
-        suffix={over ? 'en trop' : 'restantes'}
-        color={over ? t.danger : t.text}
+        suffix={over ? 'en plus' : 'restantes'}
+        color={over ? t.saving : t.text}
       />
 
       <View style={{ width: StyleSheet.hairlineWidth, height: 16, backgroundColor: t.border }} />

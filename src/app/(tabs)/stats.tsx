@@ -16,7 +16,7 @@ import {
   weekFrom,
   weekRangeLabel,
 } from '@/lib/date';
-import { effectiveCalorieGoal } from '@/lib/nutrition';
+import { dailyGoal, debtBuffer } from '@/lib/nutrition';
 import { totalsForDay, useAppStore } from '@/store/useAppStore';
 
 /** Hauteur de la zone des barres. */
@@ -50,7 +50,7 @@ export default function StatsScreen() {
           day,
           kcal: totals.kcal,
           protein: totals.protein,
-          goal: effectiveCalorieGoal(calorieGoal, events, day).goal,
+          goal: dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, day).goal,
           logged: totals.kcal > 0,
           future: day > today(),
         };
@@ -105,14 +105,14 @@ export default function StatsScreen() {
           <View style={{ height: CHART_HEIGHT, justifyContent: 'flex-end' }}>
             <Row gap={Spacing.two} style={{ alignItems: 'flex-end', height: '100%' }}>
               {days.map((d) => {
-                const over = d.kcal > d.goal;
+                const over = d.kcal > d.goal + debtBuffer(d.goal);
                 const height = d.logged ? Math.max((d.kcal / scale) * CHART_HEIGHT, 6) : 4;
                 return (
                   <View key={d.day} style={{ flex: 1, alignItems: 'center', gap: Spacing.one }}>
                     {d.logged ? (
                       <Txt
                         variant="caption"
-                        color={over ? t.danger : t.textSecondary}
+                        color={over ? t.saving : t.textSecondary}
                         style={{ fontSize: 10 }}>
                         {Math.round(d.kcal)}
                       </Txt>
@@ -125,7 +125,7 @@ export default function StatsScreen() {
                         backgroundColor: !d.logged
                           ? t.ringTrack
                           : over
-                            ? t.danger
+                            ? t.saving
                             : t.proteinDone,
                         opacity: d.future ? 0.4 : 1,
                       }}

@@ -8,9 +8,9 @@ import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { daysBetween, humanDay, shortDate, today } from '@/lib/date';
-import { adjustmentsFor, dailySaving, effectiveCalorieGoal, savedSoFar, savingStart } from '@/lib/nutrition';
+import { adjustmentsFor, dailyGoal, dailySaving, savedSoFar, savingStart } from '@/lib/nutrition';
 import type { CalorieEvent } from '@/store/types';
-import { pastEvents, upcomingEvents, useAppStore } from '@/store/useAppStore';
+import { pastEvents, totalsForDay, upcomingEvents, useAppStore } from '@/store/useAppStore';
 
 export default function EventsScreen() {
   const t = useTheme();
@@ -18,6 +18,7 @@ export default function EventsScreen() {
   const insets = useSafeAreaInsets();
   const now = today();
 
+  const entries = useAppStore((s) => s.entries);
   const events = useAppStore((s) => s.events);
   const calorieGoal = useAppStore((s) => s.calorieGoal);
   const removeEvent = useAppStore((s) => s.removeEvent);
@@ -28,8 +29,8 @@ export default function EventsScreen() {
   // a commencé prélèvent quelque chose aujourd'hui.
   const savedToday = useMemo(() => adjustmentsFor(events, now).saved, [events, now]);
   const todayGoal = useMemo(
-    () => effectiveCalorieGoal(calorieGoal, events, now).goal,
-    [calorieGoal, events, now],
+    () => dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, now).goal,
+    [entries, calorieGoal, events, now],
   );
 
   // Événements créés mais dont l'épargne n'a pas encore démarré.

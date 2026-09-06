@@ -160,7 +160,8 @@ export function calorieStreak(
 ): number {
   const held = (day: DayKey) => {
     const kcal = totalsFor(day);
-    return kcal > 0 && kcal <= effectiveCalorieGoal(baseGoal, events, day).goal;
+    const { goal } = dailyGoal(totalsFor, baseGoal, events, day);
+    return kcal > 0 && kcal <= goal + debtBuffer(goal);
   };
 
   let streak = held(from) ? 1 : 0;
@@ -209,4 +210,94 @@ export function effectiveCalorieGoal(
   const floor = safeGoalFloor(baseGoal);
   const goal = Math.max(floor, baseGoal - adjustment.saved + adjustment.released);
   return { goal, adjustment };
+}
+
+// ---------------------------------------------------------------------------
+// Dette de dépassement
+// ---------------------------------------------------------------------------
+
+/**
+ * Un dépassement franc (au-delà du tampon de bruit) n'est pas juste affiché
+ * puis oublié : il réduit légèrement l'objectif des jours suivants, pour
+ * revenir en douceur vers l'équilibre sans punir le jour même où il a eu
+ * lieu. Toujours un seul compteur fusionné (jamais plusieurs dettes
+ * empilées), toujours plafonné, et qui s'éteint tout seul si non résorbé —
+ * jamais de spirale qui s'aggrave indéfiniment.
+ */
+export const DEBT_SPREAD_DAYS = 3;
+export const DEBT_CAP = 500;
+export const DEBT_BUFFER_MIN = 150;
+export const DEBT_BUFFER_RATIO = 0.1;
+
+/** Fenêtre de recalcul : largement suffisante, le plafond et la fusion des
+ * dettes ramènent toujours à un état stable en quelques jours. */
+const DEBT_LOOKBACK_DAYS = 14;
+
+/**
+ * Tampon de bruit sous lequel un dépassement n'est pas compté : une whey
+ * post-séance ou un resto occasionnel ne doivent pas créer de dette.
+ */
+export function debtBuffer(goal: number): number {
+  return Math.max(DEBT_BUFFER_MIN, Math.round(goal * DEBT_BUFFER_RATIO));
+}
+
+type DebtState = { remaining: number; daysLeft: number };
+
+/**
+ * Réduction de dette applicable un jour donné, et nouvel état après ce jour.
+ * Les remboursements sont répartis en tranches égales sur `daysLeft` jours.
+ */
+function stepDebt(state: DebtState): { reduction: number; next: DebtState } {
+  if (state.daysLeft <= 0 || state.remaining <= 0) return { reduction: 0, next: { remaining: 0, daysLeft: 0 } };
+  const reduction = Math.min(state.remaining, Math.ceil(state.remaining / state.daysLeft));
+  return {
+    reduction,
+    next: { remaining: state.remaining - reduction, daysLeft: state.daysLeft - 1 },
+  };
+}
+
+/**
+ * Dette active un jour donné, recalculée à partir de l'historique plutôt que
+ * stockée. On rejoue les derniers jours en partant d'une dette nulle : le
+ * plafond et la fusion des dettes effacent toute erreur d'initialisation en
+ * quelques itérations.
+ */
+export function activeDebt(
+  totalsFor: (day: DayKey) => number,
+  baseGoal: number,
+  events: CalorieEvent[],
+  day: DayKey,
+): number {
+  let state: DebtState = { remaining: 0, daysLeft: 0 };
+
+  for (let i = DEBT_LOOKBACK_DAYS; i >= 0; i -= 1) {
+    const d = addDays(day, -i);
+    const { reduction, next } = stepDebt(state);
+    state = next;
+
+    if (d === day) return reduction;
+
+    const epargneGoal = effectiveCalorieGoal(baseGoal, events, d).goal;
+    const displayedGoal = Math.max(safeGoalFloor(baseGoal), epargneGoal - reduction);
+    const overage = Math.max(0, totalsFor(d) - (displayedGoal + debtBuffer(displayedGoal)));
+
+    if (overage > 0) {
+      state = { remaining: Math.min(DEBT_CAP, state.remaining + overage), daysLeft: DEBT_SPREAD_DAYS };
+    }
+  }
+
+  return 0;
+}
+
+/** Objectif du jour, épargne et dette comprises, jamais sous le plancher de sécurité. */
+export function dailyGoal(
+  totalsFor: (day: DayKey) => number,
+  baseGoal: number,
+  events: CalorieEvent[],
+  day: DayKey,
+): { goal: number; adjustment: DayAdjustment; debt: number } {
+  const { goal: epargneGoal, adjustment } = effectiveCalorieGoal(baseGoal, events, day);
+  const debt = activeDebt(totalsFor, baseGoal, events, day);
+  const goal = Math.max(safeGoalFloor(baseGoal), epargneGoal - debt);
+  return { goal, adjustment, debt };
 }
