@@ -6,16 +6,15 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * Bandeau collé en haut, révélé quand l'anneau des calories sort de l'écran.
- * Purement informatif : `pointerEvents="none"` pour ne jamais intercepter le
- * scroll ni les taps des cartes qui passent dessous.
+ * Bandeau fin collé en haut, révélé quand l'anneau des calories sort de
+ * l'écran. Purement informatif : `pointerEvents="none"` pour ne jamais
+ * intercepter le scroll ni les taps des cartes qui passent dessous.
  */
 export function StickySummary({
   consumed,
   goal,
   protein,
   proteinGoal,
-  label,
   opacity,
   translateY,
 }: {
@@ -23,7 +22,6 @@ export function StickySummary({
   goal: number;
   protein: number;
   proteinGoal: number;
-  label: string;
   opacity: Animated.AnimatedInterpolation<number>;
   translateY: Animated.AnimatedInterpolation<number>;
 }) {
@@ -45,34 +43,30 @@ export function StickySummary({
         right: 0,
         opacity,
         transform: [{ translateY }],
-        paddingTop: insets.top + Spacing.two,
-        paddingBottom: Spacing.three,
+        paddingTop: insets.top + Spacing.one,
+        paddingBottom: Spacing.two,
         paddingHorizontal: Spacing.five,
         backgroundColor: t.card,
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: t.border,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: Spacing.five,
+        gap: Spacing.four,
       }}>
       <Metric
-        value={`${Math.abs(Math.round(kcalLeft))}`}
+        value={Math.abs(Math.round(kcalLeft))}
         unit="kcal"
-        caption={over ? `en trop · ${label}` : `restantes · ${label}`}
-        ratio={goal > 0 ? Math.min(consumed / goal, 1) : 0}
-        color={over ? t.danger : t.accent}
-        track={t.ringTrack}
+        suffix={over ? 'en trop' : 'restantes'}
+        color={over ? t.danger : t.text}
       />
 
-      <View style={{ width: StyleSheet.hairlineWidth, height: 28, backgroundColor: t.border }} />
+      <View style={{ width: StyleSheet.hairlineWidth, height: 16, backgroundColor: t.border }} />
 
       <Metric
-        value={`${Math.round(proteinLeft)}`}
+        value={Math.round(proteinLeft)}
         unit="g"
-        caption={proteinDone ? 'protéines ✓' : 'protéines restantes'}
-        ratio={proteinGoal > 0 ? Math.min(protein / proteinGoal, 1) : 0}
-        color={proteinDone ? t.proteinDone : t.protein}
-        track={t.ringTrack}
+        suffix={proteinDone ? 'protéines ✓' : 'protéines'}
+        color={proteinDone ? t.proteinDone : t.text}
       />
     </Animated.View>
   );
@@ -81,35 +75,24 @@ export function StickySummary({
 function Metric({
   value,
   unit,
-  caption,
-  ratio,
+  suffix,
   color,
-  track,
 }: {
-  value: string;
+  value: number;
   unit: string;
-  caption: string;
-  ratio: number;
+  suffix: string;
   color: string;
-  track: string;
 }) {
   return (
-    <View style={{ flex: 1, gap: Spacing.one }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-        <Txt variant="heading" color={color} style={{ fontSize: 19 }}>
-          {value}
-        </Txt>
-        <Txt variant="caption" muted>
-          {unit}
-        </Txt>
-      </View>
-
-      <View style={{ height: 3, borderRadius: 2, backgroundColor: track, overflow: 'hidden' }}>
-        <View style={{ width: `${ratio * 100}%`, height: '100%', backgroundColor: color, borderRadius: 2 }} />
-      </View>
-
-      <Txt variant="caption" muted style={{ fontSize: 10 }} numberOfLines={1}>
-        {caption}
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+      <Txt variant="heading" color={color} style={{ fontSize: 16 }}>
+        {value}
+      </Txt>
+      <Txt variant="caption" color={color} style={{ fontSize: 11 }}>
+        {unit}
+      </Txt>
+      <Txt variant="caption" muted style={{ fontSize: 11 }} numberOfLines={1}>
+        {suffix}
       </Txt>
     </View>
   );

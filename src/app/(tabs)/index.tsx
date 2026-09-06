@@ -248,7 +248,6 @@ export default function TodayScreen() {
         goal={goal}
         protein={totals.protein}
         proteinGoal={proteinGoal}
-        label={humanDay(day).toLowerCase()}
         opacity={stickyOpacity}
         translateY={stickyTranslate}
       />
