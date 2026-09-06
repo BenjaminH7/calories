@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { MealPicker } from '@/components/MealPicker';
 import { ModalHeader } from '@/components/ModalHeader';
+import { NumberBox, parseNumber } from '@/components/NumberBox';
 import { QuantityField } from '@/components/QuantityField';
 import { Button, Card, Row, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
@@ -242,11 +243,6 @@ export default function ManualScreen() {
   );
 }
 
-function parseNumber(text: string): number {
-  const n = parseFloat(text.replace(',', '.'));
-  return Number.isFinite(n) && n >= 0 ? n : 0;
-}
-
 /** Bloc numéroté : le titre porte la question, en langage courant. */
 function Step({
   number,
@@ -331,64 +327,5 @@ function SourceOption({
         </Txt>
       </View>
     </Pressable>
-  );
-}
-
-function NumberBox({
-  label,
-  suffix,
-  value,
-  onChangeText,
-  color,
-  autoFocus,
-}: {
-  label: string;
-  suffix: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  color?: string;
-  autoFocus?: boolean;
-}) {
-  const t = useTheme();
-  return (
-    <View style={{ flex: 1, gap: Spacing.two }}>
-      <Txt variant="caption" muted>
-        {label}
-      </Txt>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'baseline',
-          gap: Spacing.two,
-          backgroundColor: t.cardAlt,
-          borderRadius: Radius.md,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: t.border,
-          paddingHorizontal: Spacing.four,
-          paddingVertical: Spacing.three,
-        }}>
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          keyboardType="decimal-pad"
-          placeholder="0"
-          placeholderTextColor={t.textSecondary}
-          selectTextOnFocus
-          autoFocus={autoFocus}
-          style={{
-            flex: 1,
-            fontFamily: Fonts.rounded,
-            fontSize: 26,
-            fontWeight: '800',
-            letterSpacing: -0.6,
-            color: color ?? t.text,
-            paddingVertical: 0,
-          }}
-        />
-        <Txt variant="caption" muted>
-          {suffix}
-        </Txt>
-      </View>
-    </View>
   );
 }
