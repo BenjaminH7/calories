@@ -29,8 +29,16 @@ export function StickySummary({
   const t = useTheme();
   const insets = useSafeAreaInsets();
 
-  const kcalLeft = goal - consumed;
-  const over = consumed > goal + debtBuffer(goal);
+  const buffer = debtBuffer(goal);
+  const remaining = goal - consumed;
+  const margin = goal + buffer - consumed;
+  const inBuffer = remaining < 0 && margin >= 0;
+  const overBuffer = margin < 0;
+  const over = inBuffer || overBuffer;
+
+  const kcalValue = remaining >= 0 ? remaining : overBuffer ? consumed - (goal + buffer) : margin;
+  const kcalSuffix = remaining >= 0 ? 'restantes' : overBuffer ? 'à rééquilibrer' : 'de marge';
+
   const proteinLeft = Math.max(0, proteinGoal - protein);
   const proteinDone = proteinGoal > 0 && protein >= proteinGoal;
 
@@ -55,9 +63,9 @@ export function StickySummary({
         gap: Spacing.four,
       }}>
       <Metric
-        value={Math.abs(Math.round(kcalLeft))}
+        value={Math.round(kcalValue)}
         unit="kcal"
-        suffix={over ? 'en plus' : 'restantes'}
+        suffix={kcalSuffix}
         color={over ? t.saving : t.text}
       />
 

@@ -14,14 +14,32 @@ type Props = {
 
 /**
  * Anneau principal : calories restantes au centre, arc rempli à hauteur du
- * pourcentage consommé. Un vrai dépassement (au-delà du tampon de bruit)
- * passe en ambre, jamais en rouge — l'app doit toujours encourager.
+ * pourcentage consommé.
+ *
+ * Au-delà de l'objectif, on ne dit jamais "dépassé" : entre l'objectif et le
+ * tampon de bruit, la vraie question de l'utilisateur n'est pas "j'ai
+ * échoué ?" mais "jusqu'où je peux encore aller ?" — on répond donc en marge
+ * restante, pas en déficit. Au-delà du tampon (dette réelle), le centre
+ * pointe vers le rééquilibrage à venir plutôt que vers un verdict. Toujours
+ * en ambre, jamais en rouge — l'app doit toujours encourager.
  */
 export function CalorieRing({ consumed, goal, size = 190, strokeWidth = 16 }: Props) {
   const t = useTheme();
+  const buffer = debtBuffer(goal);
   const remaining = goal - consumed;
-  const over = consumed > goal + debtBuffer(goal);
+  const margin = goal + buffer - consumed;
+  const inBuffer = remaining < 0 && margin >= 0;
+  const overBuffer = margin < 0;
+  const over = inBuffer || overBuffer;
   const ratio = goal > 0 ? Math.min(consumed / goal, 1) : 0;
+
+  const big = remaining >= 0 ? remaining : overBuffer ? 0 : margin;
+  const label = remaining >= 0 ? 'kcal restantes' : 'kcal de marge';
+  const caption = overBuffer
+    ? 'sera lissé sur les prochains jours'
+    : inBuffer
+      ? `${Math.abs(Math.round(remaining))} kcal dans la marge`
+      : null;
 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -52,12 +70,22 @@ export function CalorieRing({ consumed, goal, size = 190, strokeWidth = 16 }: Pr
         </G>
       </Svg>
 
-      <Txt variant="display" color={over ? t.saving : t.text}>
-        {Math.abs(Math.round(remaining))}
-      </Txt>
-      <Txt variant="label" muted>
-        {over ? 'kcal en plus' : 'kcal restantes'}
-      </Txt>
+      {/* Largeur bornée au carré inscrit dans le cercle : un texte plus long
+          (la légende de marge) doit passer à la ligne plutôt que déborder
+          visuellement sur le tracé de l'anneau. */}
+      <View style={{ maxWidth: size * 0.62, alignItems: 'center' }}>
+        <Txt variant="display" color={over ? t.saving : t.text}>
+          {Math.round(big)}
+        </Txt>
+        <Txt variant="label" muted>
+          {label}
+        </Txt>
+        {caption ? (
+          <Txt variant="caption" muted style={{ marginTop: 2, textAlign: 'center' }}>
+            {caption}
+          </Txt>
+        ) : null}
+      </View>
     </View>
   );
 }
