@@ -4,6 +4,7 @@ import { Alert, Animated, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CalorieRing } from '@/components/CalorieRing';
+import { DebtBanner } from '@/components/DebtBanner';
 import { Icon } from '@/components/Icon';
 import { ProteinBar } from '@/components/ProteinBar';
 import { SavingBanner } from '@/components/SavingBanner';
@@ -12,7 +13,7 @@ import { Card, Divider, Row, SectionTitle, Txt } from '@/components/ui';
 import { WeekStrip, type DaySummary } from '@/components/WeekStrip';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { daysBetween, humanDay, today, weekEndingAt, type DayKey } from '@/lib/date';
+import { addDays, daysBetween, humanDay, today, weekEndingAt, type DayKey } from '@/lib/date';
 import { calorieStreak, dailyGoal } from '@/lib/nutrition';
 import { MEAL_EMOJI, MEAL_LABELS, MEAL_ORDER, UNIT_LABELS, type FoodEntry } from '@/store/types';
 import { entriesForDay, totalsForDay, useAppStore } from '@/store/useAppStore';
@@ -46,11 +47,35 @@ export default function TodayScreen() {
 
   const dayEntries = useMemo(() => entriesForDay(entries, day), [entries, day]);
   const totals = useMemo(() => totalsForDay(entries, day), [entries, day]);
-  const { goal, adjustment, debt } = useMemo(
+  const { goal, adjustment, debt, debtRemaining, debtDaysLeft } = useMemo(
     () => dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, day),
     [entries, calorieGoal, events, day],
   );
   const eventDays = useMemo(() => new Set(events.map((e) => e.date)), [events]);
+
+  // Un dépassement en cours aujourd'hui ne réduit jamais l'objectif du jour
+  // même (jamais puni le jour où ça arrive) : la dette ne démarre que
+  // demain. Sans cet aperçu, la carte resterait muette tant que le jour
+  // n'est pas passé, alors qu'un gros dépassement est déjà visible.
+  const tomorrowPreview = useMemo(() => {
+    if (day !== today()) return { amount: 0, days: 0 };
+    const preview = dailyGoal(
+      (d) => totalsForDay(entries, d).kcal,
+      calorieGoal,
+      events,
+      addDays(day, 1),
+    );
+    // `debtDaysLeft` compte les jours après demain : demain lui-même en fait partie.
+    return { amount: preview.debt, days: preview.debt > 0 ? 1 + preview.debtDaysLeft : 0 };
+  }, [entries, calorieGoal, events, day]);
+
+  // Tant qu'on est dans le tampon, il n'y a rien à rééquilibrer : le bloc ne
+  // doit tout simplement pas exister, pas afficher un "0 kcal" déguisé.
+  const rebalance = useMemo(() => {
+    if (debt > 0) return { amount: debt + debtRemaining, days: 1 + debtDaysLeft };
+    if (tomorrowPreview.amount > 0) return tomorrowPreview;
+    return null;
+  }, [debt, debtRemaining, debtDaysLeft, tomorrowPreview]);
 
   // Série de jours consécutifs dans l'objectif calories.
   const streak = useMemo(
@@ -173,6 +198,7 @@ export default function TodayScreen() {
       <ProteinBar consumed={totals.protein} goal={proteinGoal} />
 
       <SavingBanner adjustment={adjustment} day={day} upcoming={pendingEvents} />
+      <DebtBanner rebalance={rebalance} />
 
       <View style={{ gap: Spacing.three }}>
         <SectionTitle>

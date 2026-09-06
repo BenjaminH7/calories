@@ -256,18 +256,26 @@ function stepDebt(state: DebtState): { reduction: number; next: DebtState } {
   };
 }
 
+export type DebtProgress = {
+  /** Réduction appliquée aujourd'hui. */
+  today: number;
+  /** Ce qu'il restera à lisser après aujourd'hui. */
+  remaining: number;
+  /** Jours restants après aujourd'hui pour lisser `remaining`. */
+  daysLeft: number;
+};
+
 /**
- * Dette active un jour donné, recalculée à partir de l'historique plutôt que
- * stockée. On rejoue les derniers jours en partant d'une dette nulle : le
- * plafond et la fusion des dettes effacent toute erreur d'initialisation en
- * quelques itérations.
+ * Dette recalculée à partir de l'historique plutôt que stockée. On rejoue
+ * les derniers jours en partant d'une dette nulle : le plafond et la fusion
+ * des dettes effacent toute erreur d'initialisation en quelques itérations.
  */
-export function activeDebt(
+function debtProgress(
   totalsFor: (day: DayKey) => number,
   baseGoal: number,
   events: CalorieEvent[],
   day: DayKey,
-): number {
+): DebtProgress {
   let state: DebtState = { remaining: 0, daysLeft: 0 };
 
   for (let i = DEBT_LOOKBACK_DAYS; i >= 0; i -= 1) {
@@ -275,7 +283,7 @@ export function activeDebt(
     const { reduction, next } = stepDebt(state);
     state = next;
 
-    if (d === day) return reduction;
+    if (d === day) return { today: reduction, remaining: state.remaining, daysLeft: state.daysLeft };
 
     const epargneGoal = effectiveCalorieGoal(baseGoal, events, d).goal;
     const displayedGoal = Math.max(safeGoalFloor(baseGoal), epargneGoal - reduction);
@@ -286,7 +294,17 @@ export function activeDebt(
     }
   }
 
-  return 0;
+  return { today: 0, remaining: 0, daysLeft: 0 };
+}
+
+/** Réduction de dette appliquée un jour donné. */
+export function activeDebt(
+  totalsFor: (day: DayKey) => number,
+  baseGoal: number,
+  events: CalorieEvent[],
+  day: DayKey,
+): number {
+  return debtProgress(totalsFor, baseGoal, events, day).today;
 }
 
 /** Objectif du jour, épargne et dette comprises, jamais sous le plancher de sécurité. */
@@ -295,9 +313,9 @@ export function dailyGoal(
   baseGoal: number,
   events: CalorieEvent[],
   day: DayKey,
-): { goal: number; adjustment: DayAdjustment; debt: number } {
+): { goal: number; adjustment: DayAdjustment; debt: number; debtRemaining: number; debtDaysLeft: number } {
   const { goal: epargneGoal, adjustment } = effectiveCalorieGoal(baseGoal, events, day);
-  const debt = activeDebt(totalsFor, baseGoal, events, day);
-  const goal = Math.max(safeGoalFloor(baseGoal), epargneGoal - debt);
-  return { goal, adjustment, debt };
+  const progress = debtProgress(totalsFor, baseGoal, events, day);
+  const goal = Math.max(safeGoalFloor(baseGoal), epargneGoal - progress.today);
+  return { goal, adjustment, debt: progress.today, debtRemaining: progress.remaining, debtDaysLeft: progress.daysLeft };
 }
