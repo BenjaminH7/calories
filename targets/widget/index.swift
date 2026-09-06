@@ -10,6 +10,9 @@ let snapshotKey = "snapshot"
 struct Snapshot: Codable {
   var caloriesConsumed: Int
   var caloriesGoal: Int
+  /// Tampon de bruit au-delà de l'objectif : en dessous, pas de dette, pas
+  /// de signal négatif — même logique que `CalorieRing.tsx` côté app.
+  var caloriesBuffer: Int
   var proteinConsumed: Double
   var proteinGoal: Int
   /// Jour au format `YYYY-MM-DD`, pour détecter un instantané périmé.
@@ -18,13 +21,20 @@ struct Snapshot: Codable {
   static let placeholder = Snapshot(
     caloriesConsumed: 760,
     caloriesGoal: 2000,
+    caloriesBuffer: 200,
     proteinConsumed: 68,
     proteinGoal: 140,
     day: ""
   )
 
   var caloriesRemaining: Int { caloriesGoal - caloriesConsumed }
-  var isOver: Bool { caloriesRemaining < 0 }
+  /// Ce qu'il reste avant qu'un vrai dépassement (au-delà du tampon) ne
+  /// compte pour de la dette — la question "jusqu'où je peux aller ?".
+  var margin: Int { caloriesGoal + caloriesBuffer - caloriesConsumed }
+  var inBuffer: Bool { caloriesRemaining < 0 && margin >= 0 }
+  var overBuffer: Bool { margin < 0 }
+  /// Un vrai dépassement, jamais un simple bruit de journée — jamais de rouge non plus.
+  var isOver: Bool { inBuffer || overBuffer }
   var proteinDone: Bool { proteinGoal > 0 && proteinConsumed >= Double(proteinGoal) }
 
   var calorieRatio: Double {
@@ -54,7 +64,8 @@ func readSnapshot() -> Snapshot {
     let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data)
   else {
     return Snapshot(
-      caloriesConsumed: 0, caloriesGoal: 0, proteinConsumed: 0, proteinGoal: 0, day: ""
+      caloriesConsumed: 0, caloriesGoal: 0, caloriesBuffer: 0,
+      proteinConsumed: 0, proteinGoal: 0, day: ""
     )
   }
 
@@ -116,15 +127,24 @@ struct Bar: View {
   }
 }
 
+/// Ambre partagé avec `t.saving` côté app (theme.ts) : jamais de rouge, un
+/// dépassement reste une info de budget, pas un verdict.
+let amber = Color(red: 0.96, green: 0.65, blue: 0.14)
+
 /// Anneau des calories restantes, même logique visuelle que `CalorieRing.tsx`
-/// côté app : arc rempli à hauteur du pourcentage consommé, rouge en dépassement.
+/// côté app : sous l'objectif, ce qu'il reste ; au-delà, la marge avant
+/// qu'un dépassement ne compte vraiment (jamais de rouge, jamais "en trop").
 struct CalorieRingView: View {
   let snapshot: Snapshot
   var size: CGFloat
   var strokeWidth: CGFloat = 12
 
   var body: some View {
-    let color = snapshot.isOver ? Color.red : Color.primary
+    let color = snapshot.isOver ? amber : Color.primary
+    let big = snapshot.caloriesRemaining >= 0
+      ? snapshot.caloriesRemaining
+      : (snapshot.overBuffer ? 0 : snapshot.margin)
+    let label = snapshot.caloriesRemaining >= 0 ? "kcal restantes" : "kcal de marge"
 
     ZStack {
       Circle()
@@ -136,13 +156,13 @@ struct CalorieRingView: View {
         .rotationEffect(.degrees(-90))
 
       VStack(spacing: 1) {
-        Text("\(abs(snapshot.caloriesRemaining))")
+        Text("\(big)")
           .font(.system(size: size * 0.26, weight: .heavy, design: .rounded))
           .minimumScaleFactor(0.5)
           .lineLimit(1)
           .foregroundStyle(color)
 
-        Text(snapshot.isOver ? "kcal en trop" : "kcal restantes")
+        Text(label)
           .font(.system(size: max(size * 0.075, 9), weight: .semibold, design: .rounded))
           .foregroundStyle(.secondary)
           .multilineTextAlignment(.center)

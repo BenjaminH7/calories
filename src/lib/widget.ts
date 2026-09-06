@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import { today } from '@/lib/date';
-import { dailyGoal } from '@/lib/nutrition';
+import { dailyGoal, debtBuffer } from '@/lib/nutrition';
 import { totalsForDay, useAppStore } from '@/store/useAppStore';
 
 /** Doit rester identique à app.json, expo-target.config.js et index.swift. */
@@ -11,6 +11,8 @@ const SNAPSHOT_KEY = 'snapshot';
 type Snapshot = {
   caloriesConsumed: number;
   caloriesGoal: number;
+  /** Tampon de bruit au-delà de l'objectif : le widget ne doit jamais afficher de rouge en dessous. */
+  caloriesBuffer: number;
   proteinConsumed: number;
   proteinGoal: number;
   day: string;
@@ -44,10 +46,13 @@ function buildSnapshot(): Snapshot {
   const day = today();
   const totals = totalsForDay(entries, day);
 
+  // L'objectif exposé est celui du jour, épargne et dette comprises.
+  const goal = dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, day).goal;
+
   return {
     caloriesConsumed: Math.round(totals.kcal),
-    // L'objectif exposé est celui du jour, épargne et dette comprises.
-    caloriesGoal: dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, day).goal,
+    caloriesGoal: goal,
+    caloriesBuffer: debtBuffer(goal),
     proteinConsumed: Math.round(totals.protein * 10) / 10,
     proteinGoal,
     day,
