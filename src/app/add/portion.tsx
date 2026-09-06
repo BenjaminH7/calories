@@ -327,18 +327,16 @@ export default function PortionScreen() {
               />
             ) : null}
             <View style={{ flex: 1 }}>
-              <Txt variant="heading" numberOfLines={2}>
-                {loaded.name}
-              </Txt>
+              <Row gap={Spacing.two}>
+                <Txt variant="heading" style={{ flexShrink: 1 }} numberOfLines={2}>
+                  {loaded.name}
+                </Txt>
+                {loaded.verified ? <VerifiedBadge size={17} /> : null}
+              </Row>
               <Txt variant="caption" muted>
                 {loaded.brand ? `${loaded.brand} · ` : ''}
                 {basis.kcal} kcal · {basis.protein} g prot. {perLabel}
               </Txt>
-              {loaded.verified ? (
-                <View style={{ marginTop: Spacing.two }}>
-                  <VerifiedBadge />
-                </View>
-              ) : null}
             </View>
           </Row>
 

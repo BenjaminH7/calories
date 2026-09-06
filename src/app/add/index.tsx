@@ -1,13 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
@@ -18,10 +11,19 @@ import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
-import { searchGenericFoods } from '@/lib/generic-foods';
+import { searchGenericFoods, type GenericFood } from '@/lib/generic-foods';
 import { searchProducts, type OffProduct } from '@/lib/openfoodfacts';
 import type { Meal } from '@/store/types';
 import { recentFoods, useAppStore } from '@/store/useAppStore';
+
+/**
+ * Une seule liste de résultats. Les aliments CIQUAL, mesurés en laboratoire,
+ * passent devant les fiches OpenFoodFacts, contributives, et portent une
+ * pastille verte — mais aucune section ne sépare les deux origines.
+ */
+type Result =
+  | { kind: 'generic'; key: string; food: GenericFood }
+  | { kind: 'off'; key: string; product: OffProduct };
 
 export default function AddScreen() {
   const t = useTheme();
@@ -36,7 +38,7 @@ export default function AddScreen() {
   const recents = useMemo(() => recentFoods(entries), [entries]);
 
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<OffProduct[]>([]);
+  const [products, setProducts] = useState<OffProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -46,7 +48,7 @@ export default function AddScreen() {
     abortRef.current?.abort();
 
     if (term.length < 3) {
-      setResults([]);
+      setProducts([]);
       setLoading(false);
       setError(null);
       return;
@@ -59,8 +61,8 @@ export default function AddScreen() {
 
     const timer = setTimeout(async () => {
       try {
-        setResults(await searchProducts(term, controller.signal));
-      } catch (e) {
+        setProducts(await searchProducts(term, controller.signal));
+      } catch {
         if (!controller.signal.aborted) setError('Recherche indisponible. Vérifie ta connexion.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -75,8 +77,24 @@ export default function AddScreen() {
 
   const showRecents = query.trim().length < 3;
 
-  // Aliments bruts : table CIQUAL locale, instantanée, une entrée par aliment.
-  const generic = useMemo(() => searchGenericFoods(query.trim()), [query]);
+  const results = useMemo<Result[]>(() => {
+    if (showRecents) return [];
+    return [
+      ...searchGenericFoods(query.trim()).map<Result>((food) => ({
+        kind: 'generic',
+        key: `c-${food.id}`,
+        food,
+      })),
+      ...products.map<Result>((product, i) => ({
+        kind: 'off',
+        key: `o-${product.barcode}-${i}`,
+        product,
+      })),
+    ];
+  }, [query, products, showRecents]);
+
+  const open = (extra: Record<string, string>) =>
+    router.push({ pathname: '/add/portion', params: { day, meal, ...extra } });
 
   return (
     <View style={{ flex: 1, paddingTop: topInset }}>
@@ -136,8 +154,8 @@ export default function AddScreen() {
       </View>
 
       <FlatList
-        data={showRecents ? [] : results}
-        keyExtractor={(item, i) => `${item.barcode}-${i}`}
+        data={results}
+        keyExtractor={(item) => item.key}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           padding: Spacing.five,
@@ -146,106 +164,15 @@ export default function AddScreen() {
         }}
         ListHeaderComponent={
           showRecents ? (
-            <View style={{ gap: Spacing.three }}>
-              {error ? (
-                <Txt variant="caption" color={t.danger}>
-                  {error}
-                </Txt>
-              ) : null}
-              <SectionTitle>Récents</SectionTitle>
-              {recents.length === 0 ? (
-                <Card style={{ alignItems: 'center', paddingVertical: Spacing.six }}>
-                  <Txt variant="body" muted style={{ textAlign: 'center' }}>
-                    Tes aliments déjà enregistrés apparaîtront ici{'\n'}pour les rajouter en un tap.
-                  </Txt>
-                </Card>
-              ) : (
-                <Card padded={false}>
-                  {recents.map((entry, i) => (
-                    <Pressable
-                      key={entry.id}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/add/portion',
-                          params: { repeatId: entry.id, day, meal },
-                        })
-                      }
-                      style={({ pressed }) => ({
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: Spacing.three,
-                        padding: Spacing.four,
-                        borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
-                        borderTopColor: t.border,
-                        opacity: pressed ? 0.6 : 1,
-                      })}>
-                      <View style={{ flex: 1 }}>
-                        <Txt variant="heading" style={{ fontSize: 15 }} numberOfLines={1}>
-                          {entry.name}
-                        </Txt>
-                        <Txt variant="caption" muted numberOfLines={1}>
-                          {entry.basis.kcal} kcal · {entry.basis.protein} g prot. /{' '}
-                          {entry.basis.per === 1 ? '1' : '100'} {entry.basis.unit}
-                        </Txt>
-                      </View>
-                      <Icon name="plus" size={18} color={t.textSecondary} />
-                    </Pressable>
-                  ))}
-                </Card>
-              )}
-            </View>
+            <RecentsSection recents={recents} error={error} onPick={(id) => open({ repeatId: id })} />
           ) : error ? (
             <Txt variant="caption" color={t.danger} style={{ marginBottom: Spacing.three }}>
               {error}
             </Txt>
-          ) : (
-            <View style={{ gap: Spacing.three, marginBottom: Spacing.three }}>
-              {generic.length > 0 && (
-                <>
-                  <SectionTitle>Aliments vérifiés</SectionTitle>
-                  <Card padded={false}>
-                    {generic.map((food, i) => (
-                      <Pressable
-                        key={food.id}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/add/portion',
-                            params: { genericId: food.id, day, meal },
-                          })
-                        }
-                        style={({ pressed }) => ({
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: Spacing.three,
-                          padding: Spacing.four,
-                          borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
-                          borderTopColor: t.border,
-                          opacity: pressed ? 0.6 : 1,
-                        })}>
-                        <View style={{ flex: 1, gap: 3 }}>
-                          <Txt variant="heading" style={{ fontSize: 15 }} numberOfLines={1}>
-                            {food.name}
-                          </Txt>
-                          <Txt variant="caption" muted numberOfLines={1}>
-                            {food.kcal} kcal · {food.protein} g prot. / 100 {food.unit}
-                          </Txt>
-                          <VerifiedBadge compact />
-                        </View>
-                        <Icon name="chevronRight" size={16} color={t.textSecondary} />
-                      </Pressable>
-                    ))}
-                  </Card>
-                </>
-              )}
-
-              {results.length > 0 && (
-                <SectionTitle>Produits emballés · OpenFoodFacts</SectionTitle>
-              )}
-            </View>
-          )
+          ) : null
         }
         ListEmptyComponent={
-          showRecents || loading || generic.length > 0 ? null : (
+          showRecents || loading ? null : (
             <Card style={{ alignItems: 'center', paddingVertical: Spacing.six, gap: Spacing.three }}>
               <Txt variant="body" muted style={{ textAlign: 'center' }}>
                 Aucun résultat pour « {query.trim()} ».
@@ -261,33 +188,105 @@ export default function AddScreen() {
             </Card>
           )
         }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push({ pathname: '/add/portion', params: { barcode: item.barcode, day, meal } })}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: Spacing.three,
-              backgroundColor: t.card,
-              borderRadius: Radius.md,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: t.border,
-              padding: Spacing.four,
-              opacity: pressed ? 0.6 : 1,
-            })}>
-            <View style={{ flex: 1 }}>
-              <Txt variant="heading" style={{ fontSize: 15 }} numberOfLines={1}>
-                {item.name}
-              </Txt>
-              <Txt variant="caption" muted numberOfLines={1}>
-                {item.brand ? `${item.brand} · ` : ''}
-                {item.kcalPer100} kcal · {item.proteinPer100} g prot. / 100 {item.baseUnit}
-              </Txt>
-            </View>
-            <Icon name="chevronRight" size={16} color={t.textSecondary} />
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const verified = item.kind === 'generic';
+          const name = verified ? item.food.name : item.product.name;
+          const subtitle = verified
+            ? `${item.food.kcal} kcal · ${item.food.protein} g prot. / 100 ${item.food.unit}`
+            : `${item.product.brand ? `${item.product.brand} · ` : ''}` +
+              `${item.product.kcalPer100} kcal · ${item.product.proteinPer100} g prot. / 100 ${item.product.baseUnit}`;
+
+          return (
+            <Pressable
+              onPress={() =>
+                open(verified ? { genericId: item.food.id } : { barcode: item.product.barcode })
+              }
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: Spacing.three,
+                backgroundColor: t.card,
+                borderRadius: Radius.md,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: t.border,
+                padding: Spacing.four,
+                opacity: pressed ? 0.6 : 1,
+              })}>
+              <View style={{ flex: 1 }}>
+                <Row gap={Spacing.two}>
+                  <Txt variant="heading" style={{ flexShrink: 1, fontSize: 15 }} numberOfLines={1}>
+                    {name}
+                  </Txt>
+                  {verified ? <VerifiedBadge /> : null}
+                </Row>
+                <Txt variant="caption" muted numberOfLines={1}>
+                  {subtitle}
+                </Txt>
+              </View>
+              <Icon name="chevronRight" size={16} color={t.textSecondary} />
+            </Pressable>
+          );
+        }}
       />
+    </View>
+  );
+}
+
+function RecentsSection({
+  recents,
+  error,
+  onPick,
+}: {
+  recents: ReturnType<typeof recentFoods>;
+  error: string | null;
+  onPick: (entryId: string) => void;
+}) {
+  const t = useTheme();
+
+  return (
+    <View style={{ gap: Spacing.three }}>
+      {error ? (
+        <Txt variant="caption" color={t.danger}>
+          {error}
+        </Txt>
+      ) : null}
+      <SectionTitle>Récents</SectionTitle>
+
+      {recents.length === 0 ? (
+        <Card style={{ alignItems: 'center', paddingVertical: Spacing.six }}>
+          <Txt variant="body" muted style={{ textAlign: 'center' }}>
+            Tes aliments déjà enregistrés apparaîtront ici{'\n'}pour les rajouter en un tap.
+          </Txt>
+        </Card>
+      ) : (
+        <Card padded={false}>
+          {recents.map((entry, i) => (
+            <Pressable
+              key={entry.id}
+              onPress={() => onPick(entry.id)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: Spacing.three,
+                padding: Spacing.four,
+                borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                borderTopColor: t.border,
+                opacity: pressed ? 0.6 : 1,
+              })}>
+              <View style={{ flex: 1 }}>
+                <Txt variant="heading" style={{ fontSize: 15 }} numberOfLines={1}>
+                  {entry.name}
+                </Txt>
+                <Txt variant="caption" muted numberOfLines={1}>
+                  {entry.basis.kcal} kcal · {entry.basis.protein} g prot. /{' '}
+                  {entry.basis.per === 1 ? '1' : '100'} {entry.basis.unit}
+                </Txt>
+              </View>
+              <Icon name="plus" size={18} color={t.textSecondary} />
+            </Pressable>
+          ))}
+        </Card>
+      )}
     </View>
   );
 }
