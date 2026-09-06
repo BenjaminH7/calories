@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CalorieRing } from '@/components/CalorieRing';
 import { Icon } from '@/components/Icon';
 import { ProteinBar } from '@/components/ProteinBar';
 import { SavingBanner } from '@/components/SavingBanner';
+import { StickySummary } from '@/components/StickySummary';
 import { Card, Divider, Row, SectionTitle, Txt } from '@/components/ui';
 import { WeekStrip, type DaySummary } from '@/components/WeekStrip';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
@@ -21,6 +22,21 @@ export default function TodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [day, setDay] = useState<DayKey>(today());
+
+  // Le bandeau récapitulatif prend le relais quand l'anneau quitte l'écran.
+  // `Animated` de React Native (et non Reanimated) : l'opacité et la
+  // translation partent sur le thread natif sans plugin Babel supplémentaire.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const stickyOpacity = scrollY.interpolate({
+    inputRange: [120, 190],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const stickyTranslate = scrollY.interpolate({
+    inputRange: [120, 190],
+    outputRange: [-12, 0],
+    extrapolate: 'clamp',
+  });
 
   const entries = useAppStore((s) => s.entries);
   const events = useAppStore((s) => s.events);
@@ -88,8 +104,13 @@ export default function TodayScreen() {
     ]);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: t.background }}
+    <View style={{ flex: 1, backgroundColor: t.background }}>
+    <Animated.ScrollView
+      style={{ flex: 1 }}
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+      })}
+      scrollEventThrottle={16}
       contentContainerStyle={{
         paddingTop: insets.top + Spacing.three,
         paddingHorizontal: Spacing.five,
@@ -220,7 +241,18 @@ export default function TodayScreen() {
           </Txt>
         ) : null}
       </View>
-    </ScrollView>
+    </Animated.ScrollView>
+
+      <StickySummary
+        consumed={totals.kcal}
+        goal={goal}
+        protein={totals.protein}
+        proteinGoal={proteinGoal}
+        label={humanDay(day).toLowerCase()}
+        opacity={stickyOpacity}
+        translateY={stickyTranslate}
+      />
+    </View>
   );
 }
 
