@@ -20,7 +20,8 @@ const PRESETS = [
 ];
 
 const BUDGETS = [500, 700, 1000, 1500, 2000];
-const SPREADS = [3, 5, 7, 10, 14];
+/** Durées proposées ; la durée maximale possible est toujours ajoutée en plus. */
+const SPREADS = [3, 5, 7, 10, 14, 21, 30];
 
 export default function NewEventScreen() {
   const t = useTheme();
@@ -44,9 +45,19 @@ export default function NewEventScreen() {
   const tooAggressive = perDay > calorieGoal * 0.25;
 
   const dateOptions = useMemo(
-    () => Array.from({ length: 21 }, (_, i) => addDays(today(), i + 1)),
+    () => Array.from({ length: 60 }, (_, i) => addDays(today(), i + 1)),
     [],
   );
+
+  // Les durées plus longues que le délai restant n'ont pas de sens ; on ajoute
+  // toujours le maximum possible, qui fait démarrer l'épargne dès aujourd'hui.
+  const spreadOptions = useMemo(
+    () => [...new Set([...SPREADS.filter((s) => s < maxSpread), maxSpread])],
+    [maxSpread],
+  );
+
+  const savingStartsOn = addDays(date, -effectiveSpread);
+  const startsToday = effectiveSpread === maxSpread;
 
   const save = () => {
     if (!name.trim() || budget <= 0) return;
@@ -164,16 +175,20 @@ export default function NewEventScreen() {
         <Card style={{ gap: Spacing.four }}>
           <SectionTitle>Épargner sur combien de jours ?</SectionTitle>
           <Row gap={Spacing.two} style={{ flexWrap: 'wrap' }}>
-            {SPREADS.filter((s) => s <= maxSpread || s === SPREADS[0]).map((s) => (
-              <Chip key={s} label={`${s} jours`} selected={effectiveSpread === s} onPress={() => setSpread(s)} />
+            {spreadOptions.map((s) => (
+              <Chip
+                key={s}
+                label={s === maxSpread ? `Dès aujourd'hui (${s} j)` : `${s} jours`}
+                selected={effectiveSpread === s}
+                onPress={() => setSpread(s)}
+              />
             ))}
           </Row>
-          {spread > maxSpread ? (
-            <Txt variant="caption" muted>
-              L&apos;événement est dans {maxSpread} jour{maxSpread > 1 ? 's' : ''} : l&apos;épargne
-              sera répartie sur {effectiveSpread}.
-            </Txt>
-          ) : null}
+          <Txt variant="caption" muted>
+            {startsToday
+              ? `L'épargne démarre aujourd'hui, au plus tôt possible.`
+              : `L'épargne démarrera le ${shortDate(savingStartsOn)}. Choisis une durée plus longue pour commencer plus tôt.`}
+          </Txt>
         </Card>
 
         <Card style={{ gap: Spacing.three, backgroundColor: t.cardAlt }}>
@@ -195,7 +210,8 @@ export default function NewEventScreen() {
             </View>
           </Row>
           <Txt variant="caption" muted>
-            Le {shortDate(date)}, ton objectif passera à{' '}
+            Du {startsToday ? "aujourd'hui" : shortDate(savingStartsOn)} au{' '}
+            {shortDate(addDays(date, -1))}, puis le {shortDate(date)} ton objectif passera à{' '}
             <Txt variant="caption" color={t.text}>
               {calorieGoal + Math.round(budget)} kcal
             </Txt>

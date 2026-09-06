@@ -60,20 +60,57 @@ Exemple avec 2000 kcal/jour, un resto à +1000 kcal étalé sur 7 jours :
 | J-7 → J-1 | 1855 kcal | +145 kcal / jour |
 | Jour J | 3000 kcal | 1000 kcal débloquées |
 
+## Widget iOS (écran d'accueil)
+
+Le widget affiche les calories restantes, les protéines du jour (vertes une fois
+l'objectif atteint) et, en taille moyenne, un bouton **Scanner** qui ouvre
+directement la caméra via le lien profond `kcal:///add/scan`.
+
+Il repose sur `@bacons/apple-targets` : c'est du code natif, donc **il ne
+fonctionne pas dans Expo Go**. Il faut un development build.
+
+```bash
+# 1. Renseigne ton Apple Team ID dans app.json (expo.ios.appleTeamId)
+# 2. Génère le projet natif
+npx expo prebuild -p ios --clean
+# 3. Compile et installe sur ton appareil
+npx expo run:ios --device
+```
+
+Puis, sur le téléphone : appui long sur l'écran d'accueil → **+** → « Kcal ».
+
+Comment ça circule :
+
+| Étage | Fichier |
+| --- | --- |
+| Écriture de l'instantané + rechargement du widget | [`src/lib/widget.ts`](src/lib/widget.ts) |
+| Déclaration de la cible et de l'App Group | [`targets/widget/expo-target.config.js`](targets/widget/expo-target.config.js) |
+| Interface SwiftUI | [`targets/widget/index.swift`](targets/widget/index.swift) |
+
+L'App Group `group.com.benjamin.kcal` est déclaré à trois endroits qui doivent
+rester d'accord : `app.json`, `expo-target.config.js` et `index.swift`. Si tu
+changes le bundle identifier, change les trois.
+
+`startWidgetSync()` est branché sur le store depuis le layout racine : chaque
+ajout d'aliment réécrit l'instantané et appelle `reloadWidget()`. Sur Android,
+sur le web et dans Expo Go, l'appel est simplement ignoré.
+
 ## Structure
 
 ```
+targets/widget/        widget iOS (SwiftUI + config de la cible)
 src/
   app/                 routes expo-router
-    (tabs)/            accueil, épargne, réglages
+    (tabs)/            accueil, stats, épargne, réglages
     add/               scan, recherche, portion, saisie manuelle
     event/new.tsx      création d'une épargne
     onboarding.tsx
   components/          UI (anneau, barre protéines, bandeau semaine, tab bar…)
   lib/
-    date.ts            manipulation des jours `YYYY-MM-DD`
+    date.ts            manipulation des jours `YYYY-MM-DD` et des semaines
     nutrition.ts       Mifflin-St Jeor + calcul de l'épargne
     openfoodfacts.ts   client API + conversion des portions
+    widget.ts          pont vers le widget iOS (App Group)
   store/               état zustand persisté (expo-sqlite/kv-store)
 ```
 

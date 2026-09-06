@@ -6,6 +6,7 @@ import { useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Colors } from '@/constants/theme';
+import { startWidgetSync } from '@/lib/widget';
 import { useAppStore } from '@/store/useAppStore';
 
 SplashScreen.preventAutoHideAsync();
@@ -19,6 +20,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (hydrated) SplashScreen.hideAsync();
+  }, [hydrated]);
+
+  // Alimente le widget iOS dès que le journal change.
+  useEffect(() => {
+    if (!hydrated) return;
+    return startWidgetSync();
   }, [hydrated]);
 
   const navTheme = {
