@@ -72,3 +72,36 @@ export function shortDate(key: DayKey): string {
 export function weekEndingAt(end: DayKey): DayKey[] {
   return Array.from({ length: 7 }, (_, i) => addDays(end, i - 6));
 }
+
+/** Lundi de la semaine contenant `key`. */
+export function mondayOf(key: DayKey): DayKey {
+  const d = fromDayKey(key);
+  const offset = (d.getDay() + 6) % 7; // dimanche = 6
+  return addDays(key, -offset);
+}
+
+/** Les 7 jours de la semaine commençant au lundi `monday`. */
+export function weekFrom(monday: DayKey): DayKey[] {
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+}
+
+/** « 1 – 7 septembre » ou « 29 sept. – 5 oct. » si la semaine est à cheval. */
+export function weekRangeLabel(monday: DayKey): string {
+  const start = fromDayKey(monday);
+  const end = fromDayKey(addDays(monday, 6));
+  if (start.getMonth() === end.getMonth()) {
+    return `${start.getDate()} – ${end.getDate()} ${MONTHS[end.getMonth()]}`;
+  }
+  return `${start.getDate()} ${MONTHS[start.getMonth()].slice(0, 4)}. – ${end.getDate()} ${MONTHS[
+    end.getMonth()
+  ].slice(0, 4)}.`;
+}
+
+/** « Cette semaine », « Semaine dernière », sinon la plage de dates. */
+export function humanWeek(monday: DayKey): string {
+  const current = mondayOf(today());
+  const diff = daysBetween(monday, current) / 7;
+  if (diff === 0) return 'Cette semaine';
+  if (diff === 1) return 'Semaine dernière';
+  return weekRangeLabel(monday);
+}

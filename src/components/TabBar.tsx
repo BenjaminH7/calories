@@ -11,12 +11,14 @@ import { useTheme } from '@/hooks/use-theme';
 
 const ICONS: Record<string, IconName> = {
   index: 'home',
+  stats: 'chart',
   events: 'wallet',
   settings: 'sliders',
 };
 
 const LABELS: Record<string, string> = {
-  index: "Aujourd'hui",
+  index: 'Accueil',
+  stats: 'Stats',
   events: 'Épargne',
   settings: 'Réglages',
 };
@@ -31,8 +33,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  // `flex` permet d'équilibrer les deux moitiés autour du bouton central :
-  // 2 unités à gauche (deux onglets), 2 à droite (un onglet double largeur).
+  // Deux onglets de chaque côté du bouton d'ajout : il tombe pile au centre.
   const renderTab = (routeName: string, flex = 1) => {
     const index = state.routes.findIndex((r) => r.name === routeName);
     if (index === -1) return null;
@@ -74,7 +75,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         paddingHorizontal: Spacing.two,
       }}>
       {renderTab('index')}
-      {renderTab('events')}
+      {renderTab('stats')}
 
       <View style={{ width: 72, alignItems: 'center' }}>
         <Pressable
@@ -103,7 +104,8 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         </Pressable>
       </View>
 
-      {renderTab('settings', 2)}
+      {renderTab('events')}
+      {renderTab('settings')}
     </View>
   );
 }

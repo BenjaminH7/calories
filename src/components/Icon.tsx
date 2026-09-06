@@ -17,7 +17,8 @@ export type IconName =
   | 'check'
   | 'calendar'
   | 'pencil'
-  | 'flame';
+  | 'flame'
+  | 'chart';
 
 type Props = {
   name: IconName;
@@ -101,6 +102,10 @@ export function Icon({ name, size = 22, color, strokeWidth = 2 }: Props) {
           <Path d="M4 20.5 4.9 16 16 4.9l3.1 3.1L8 19.1z" {...common} />
           <Path d="m14.2 6.7 3.1 3.1" {...common} />
         </>
+      )}
+
+      {name === 'chart' && (
+        <Path d="M5 20V12M12 20V4.5M19 20v-5.5" {...common} strokeWidth={strokeWidth + 0.4} />
       )}
 
       {name === 'flame' && (
