@@ -96,7 +96,7 @@ export function SavingBanner({
         {!isEventDay && (
           <View style={{ alignItems: 'flex-end' }}>
             <Txt variant="heading" color={t.saving}>
-              −{dailySaving(event)}
+              −{dailySaving(event, day)}
             </Txt>
             <Txt variant="caption" muted>
               kcal aujourd&apos;hui

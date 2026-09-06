@@ -152,8 +152,8 @@ function EventCard({ event, onDelete }: { event: CalorieEvent; onDelete: () => v
   const isToday = daysLeft === 0;
   const saved = savedSoFar(event, now);
   const ratio = Math.min(saved / Math.max(1, event.budget), 1);
-  const perDay = dailySaving(event);
   const savingActive = daysLeft >= 1 && daysLeft <= event.spreadDays;
+  const perDay = savingActive ? dailySaving(event, now) : dailySaving(event);
 
   return (
     <Card style={{ gap: Spacing.four }}>

@@ -35,7 +35,6 @@ export default function StatsScreen() {
   const entries = useAppStore((s) => s.entries);
   const events = useAppStore((s) => s.events);
   const calorieGoal = useAppStore((s) => s.calorieGoal);
-  const proteinGoal = useAppStore((s) => s.proteinGoal);
 
   const currentMonday = mondayOf(today());
   const [monday, setMonday] = useState<DayKey>(currentMonday);
@@ -56,9 +55,9 @@ export default function StatsScreen() {
     [entries, events, calorieGoal, monday],
   );
 
+  // Les moyennes ne portent que sur les jours renseignés : un jour vide
+  // tirerait la moyenne vers le bas sans rien vouloir dire.
   const logged = days.filter((d) => d.logged);
-  const onTarget = logged.filter((d) => d.kcal <= d.goal).length;
-  const proteinHit = logged.filter((d) => proteinGoal > 0 && d.protein >= proteinGoal).length;
   const avgKcal = logged.length ? Math.round(logged.reduce((s, d) => s + d.kcal, 0) / logged.length) : 0;
   const avgProtein = logged.length
     ? Math.round(logged.reduce((s, d) => s + d.protein, 0) / logged.length)
@@ -97,26 +96,9 @@ export default function StatsScreen() {
       </Row>
 
       {/* Graphique de la semaine */}
-      <Card style={{ gap: Spacing.five }}>
-        <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <View>
-            <SectionTitle>Moyenne par jour</SectionTitle>
-            <Txt variant="title">
-              {avgKcal}
-              <Txt variant="heading" muted>
-                {' '}
-                kcal
-              </Txt>
-            </Txt>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <SectionTitle>Objectif</SectionTitle>
-            <Txt variant="heading" muted>
-              {calorieGoal} kcal
-            </Txt>
-          </View>
-        </Row>
-
+      <Card style={{ gap: Spacing.four }}>
+        {/* Barres et initiales des jours forment un bloc : elles se touchent. */}
+        <View style={{ gap: Spacing.two }}>
         <View style={{ height: 150, justifyContent: 'flex-end' }}>
           {/* Ligne d'objectif */}
           <View
@@ -171,25 +153,17 @@ export default function StatsScreen() {
             </Txt>
           ))}
         </Row>
+        </View>
+
+        <Txt variant="caption" muted>
+          Le trait horizontal marque ton objectif de {calorieGoal} kcal.
+        </Txt>
       </Card>
 
-      {/* Résumé */}
-      <Row gap={Spacing.three}>
-        <Tile
-          value={`${onTarget}/${logged.length || 0}`}
-          label="jours dans l'objectif"
-          color={onTarget === logged.length && logged.length > 0 ? t.proteinDone : undefined}
-        />
-        <Tile
-          value={`${proteinHit}/${logged.length || 0}`}
-          label="jours protéines OK"
-          color={proteinHit === logged.length && logged.length > 0 ? t.proteinDone : undefined}
-        />
-      </Row>
-
-      <Row gap={Spacing.three}>
-        <Tile value={`${avgProtein} g`} label="protéines / jour" color={t.protein} />
-        <Tile value={`${logged.length}/7`} label="jours renseignés" />
+      {/* Moyennes, calculées sur les seuls jours renseignés */}
+      <Row gap={Spacing.three} style={{ alignItems: 'stretch' }}>
+        <Tile label="Moyenne de la semaine" value={avgKcal} unit="kcal" />
+        <Tile label="Moyenne protéines" value={avgProtein} unit="g" />
       </Row>
 
       {logged.length === 0 ? (
@@ -204,15 +178,19 @@ export default function StatsScreen() {
   );
 }
 
-function Tile({ value, label, color }: { value: string; label: string; color?: string }) {
+/** Tuile de moyenne. Les deux partagent la même hauteur via `alignItems: stretch`. */
+function Tile({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
-    <Card style={{ flex: 1, gap: Spacing.one }}>
-      <Txt variant="title" color={color} style={{ fontSize: 24 }}>
-        {value}
-      </Txt>
-      <Txt variant="caption" muted>
-        {label}
-      </Txt>
+    <Card style={{ flex: 1, gap: Spacing.two, paddingVertical: Spacing.four }}>
+      <SectionTitle>{label}</SectionTitle>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one }}>
+        <Txt variant="title" style={{ fontSize: 26 }}>
+          {value}
+        </Txt>
+        <Txt variant="label" muted>
+          {unit}
+        </Txt>
+      </View>
     </Card>
   );
 }

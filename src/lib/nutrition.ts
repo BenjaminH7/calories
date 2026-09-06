@@ -85,10 +85,40 @@ export type DayAdjustment = {
   happeningToday: CalorieEvent[];
 };
 
-/** Prélèvement quotidien d'un événement, arrondi à 5 kcal près. */
-export function dailySaving(event: CalorieEvent): number {
+/**
+ * Rang chronologique d'un jour dans la fenêtre d'épargne : 1 pour le premier
+ * jour de prélèvement, `spreadDays` pour la veille de l'événement.
+ */
+function savingDayIndex(event: CalorieEvent, day: DayKey): number {
+  return Math.max(1, event.spreadDays) - daysBetween(day, event.date) + 1;
+}
+
+/**
+ * Total mis de côté après `n` jours d'épargne.
+ *
+ * On arrondit le **cumul**, jamais le prélèvement quotidien : c'est ce qui
+ * garantit que la somme des prélèvements vaut exactement le budget. Arrondir
+ * chaque jour puis multiplier laissait un écart pouvant atteindre plusieurs
+ * dizaines de kcal, dans un sens comme dans l'autre.
+ */
+function savedThrough(event: CalorieEvent, n: number): number {
   const days = Math.max(1, event.spreadDays);
-  return round5(event.budget / days);
+  const clamped = Math.min(Math.max(n, 0), days);
+  // Le dernier jour solde le compte au centime près.
+  if (clamped >= days) return event.budget;
+  return round5((event.budget * clamped) / days);
+}
+
+/**
+ * Prélèvement pour un jour donné. Sans `day`, renvoie la moyenne indicative
+ * (utilisée pour annoncer une épargne qui n'a pas encore commencé).
+ */
+export function dailySaving(event: CalorieEvent, day?: DayKey): number {
+  const days = Math.max(1, event.spreadDays);
+  if (!day) return round5(event.budget / days);
+
+  const index = savingDayIndex(event, day);
+  return savedThrough(event, index) - savedThrough(event, index - 1);
 }
 
 /** Premier jour de prélèvement (inclus). L'événement lui-même ne prélève pas. */
@@ -103,16 +133,14 @@ export function isSavingDay(event: CalorieEvent, day: DayKey): boolean {
 
 /** Ce qui a déjà été mis de côté pour un événement à la date `day` (incluse). */
 export function savedSoFar(event: CalorieEvent, day: DayKey): number {
-  const elapsed = Math.max(1, event.spreadDays) - Math.max(0, daysBetween(day, event.date) - 1);
-  const clamped = Math.min(Math.max(elapsed, 0), Math.max(1, event.spreadDays));
-  return Math.min(event.budget, clamped * dailySaving(event));
+  return savedThrough(event, savingDayIndex(event, day));
 }
 
 export function adjustmentsFor(events: CalorieEvent[], day: DayKey): DayAdjustment {
   const savingFor = events.filter((e) => isSavingDay(e, day));
   const happeningToday = events.filter((e) => e.date === day);
   return {
-    saved: savingFor.reduce((sum, e) => sum + dailySaving(e), 0),
+    saved: savingFor.reduce((sum, e) => sum + dailySaving(e, day), 0),
     released: happeningToday.reduce((sum, e) => sum + e.budget, 0),
     savingFor,
     happeningToday,
