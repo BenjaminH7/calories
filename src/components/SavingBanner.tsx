@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 import { Row, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DayKey, daysBetween, humanDay, shortDate } from '@/lib/date';
+import { daysBetween, humanDay, shortDate, type DayKey } from '@/lib/date';
 import { dailySaving, savedSoFar, savingStart, type DayAdjustment } from '@/lib/nutrition';
 import type { CalorieEvent } from '@/store/types';
 

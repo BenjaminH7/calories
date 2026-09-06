@@ -7,7 +7,7 @@ import { ModalHeader } from '@/components/ModalHeader';
 import { Button, Card, Chip, Row, SectionTitle, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addDays, daysBetween, DayKey, humanDay, shortDate, today } from '@/lib/date';
+import { addDays, daysBetween, humanDay, shortDate, today, type DayKey } from '@/lib/date';
 import { useAppStore } from '@/store/useAppStore';
 
 const PRESETS = [

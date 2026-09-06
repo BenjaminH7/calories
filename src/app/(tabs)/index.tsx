@@ -11,7 +11,7 @@ import { Card, Divider, Row, SectionTitle, Txt } from '@/components/ui';
 import { WeekStrip, type DaySummary } from '@/components/WeekStrip';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DayKey, daysBetween, humanDay, today, weekEndingAt } from '@/lib/date';
+import { daysBetween, humanDay, today, weekEndingAt, type DayKey } from '@/lib/date';
 import { calorieStreak, effectiveCalorieGoal } from '@/lib/nutrition';
 import { MEAL_EMOJI, MEAL_LABELS, MEAL_ORDER, UNIT_LABELS, type FoodEntry } from '@/store/types';
 import { entriesForDay, totalsForDay, useAppStore } from '@/store/useAppStore';

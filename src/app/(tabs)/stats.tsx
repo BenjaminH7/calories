@@ -8,7 +8,7 @@ import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   addDays,
-  DayKey,
+  type DayKey,
   humanWeek,
   mondayOf,
   today,

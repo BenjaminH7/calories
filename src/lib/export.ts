@@ -1,4 +1,4 @@
-import { addDays, DayKey, fromDayKey, today } from '@/lib/date';
+import { addDays, fromDayKey, today, type DayKey } from '@/lib/date';
 import { ACTIVITY_LABELS, effectiveCalorieGoal, GOAL_LABELS } from '@/lib/nutrition';
 import {
   MEAL_LABELS,

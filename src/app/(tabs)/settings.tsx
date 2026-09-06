@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { useAppStore } from '@/store/useAppStore';
 export default function SettingsScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const profile = useAppStore((s) => s.profile);
   const calorieGoal = useAppStore((s) => s.calorieGoal);
@@ -159,7 +161,7 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      <Card style={{ gap: Spacing.three }}>
+      <Card style={{ gap: Spacing.four }}>
         <SectionTitle>Données</SectionTitle>
         <Txt variant="body" muted>
           Tout est stocké sur ton téléphone. Les valeurs nutritionnelles viennent d&apos;
@@ -168,6 +170,11 @@ export default function SettingsScreen() {
         <Txt variant="caption" muted>
           {entries.length} aliment(s) enregistré(s).
         </Txt>
+        <Button
+          title="Exporter mon journal"
+          variant="secondary"
+          onPress={() => router.push('/export')}
+        />
       </Card>
 
       <Button title="Effacer toutes les données" variant="danger" onPress={confirmReset} />

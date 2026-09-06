@@ -57,6 +57,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="add" options={{ presentation: 'modal' }} />
             <Stack.Screen name="event/new" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="export" options={{ presentation: 'modal' }} />
           </Stack.Protected>
 
           <Stack.Protected guard={!onboarded}>

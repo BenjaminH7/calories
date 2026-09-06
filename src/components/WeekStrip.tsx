@@ -4,7 +4,7 @@ import Svg, { Circle, G } from 'react-native-svg';
 import { Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DayKey, dayNumber, today, weekdayLetter } from '@/lib/date';
+import { dayNumber, today, weekdayLetter, type DayKey } from '@/lib/date';
 
 export type DaySummary = {
   day: DayKey;

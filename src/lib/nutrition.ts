@@ -1,4 +1,4 @@
-import { addDays, daysBetween, DayKey } from '@/lib/date';
+import { addDays, daysBetween, type DayKey } from '@/lib/date';
 import type { CalorieEvent, Profile } from '@/store/types';
 
 export const ACTIVITY_FACTORS = {
