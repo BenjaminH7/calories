@@ -8,11 +8,13 @@ import { MealPicker } from '@/components/MealPicker';
 import { ModalHeader } from '@/components/ModalHeader';
 import { NumberBox, parseNumber } from '@/components/NumberBox';
 import { QuantityField } from '@/components/QuantityField';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
+import { basisForGeneric, findGenericFood, unitsForGeneric } from '@/lib/generic-foods';
 import { basisFor, fetchByBarcode, type OffProduct } from '@/lib/openfoodfacts';
 import { basisForUnit, equivalentLabel, isPerOne, referenceLabelFor, totalsFor } from '@/lib/units';
 import { defaultMeal, UNIT_LABELS, type Meal, type NutritionBasis, type Unit } from '@/store/types';
@@ -27,6 +29,8 @@ type Loaded = {
   quantity: number;
   units: Unit[];
   product?: OffProduct;
+  /** Vient de la table CIQUAL : valeurs mesurées, pas contributives. */
+  verified?: boolean;
 };
 
 /**
@@ -41,6 +45,7 @@ export default function PortionScreen() {
     barcode?: string;
     entryId?: string;
     repeatId?: string;
+    genericId?: string;
     day?: string;
     meal?: Meal;
   }>();
@@ -61,7 +66,7 @@ export default function PortionScreen() {
   const [quantity, setQuantity] = useState(100);
   const [unit, setUnit] = useState<Unit>('g');
   const [meal, setMeal] = useState<Meal>(params.meal ?? defaultMeal());
-  const [loading, setLoading] = useState(Boolean(params.barcode));
+  const [loading, setLoading] = useState(Boolean(params.barcode || params.genericId));
   const [error, setError] = useState<string | null>(null);
 
   // Correction des valeurs de référence : OpenFoodFacts est contributif, les
@@ -97,6 +102,29 @@ export default function PortionScreen() {
     if (params.entryId) setMeal(sourceEntry.meal);
     setLoading(false);
   }, [sourceEntry, params.entryId]);
+
+  // Aliment générique CIQUAL : la table est embarquée, rien à charger.
+  useEffect(() => {
+    if (!params.genericId || sourceEntry) return;
+    const food = findGenericFood(params.genericId);
+    if (!food) {
+      setError('inconnu');
+      setLoading(false);
+      return;
+    }
+    setLoaded({
+      name: food.name,
+      basis: basisForGeneric(food, food.unit),
+      quantity: 100,
+      units: unitsForGeneric(food),
+      verified: true,
+    });
+    setUnit(food.unit);
+    setQuantity(100);
+    setKcalRef(String(food.kcal));
+    setProteinRef(String(food.protein));
+    setLoading(false);
+  }, [params.genericId, sourceEntry]);
 
   // Produit OpenFoodFacts.
   useEffect(() => {
@@ -306,6 +334,11 @@ export default function PortionScreen() {
                 {loaded.brand ? `${loaded.brand} · ` : ''}
                 {basis.kcal} kcal · {basis.protein} g prot. {perLabel}
               </Txt>
+              {loaded.verified ? (
+                <View style={{ marginTop: Spacing.two }}>
+                  <VerifiedBadge />
+                </View>
+              ) : null}
             </View>
           </Row>
 
@@ -319,7 +352,11 @@ export default function PortionScreen() {
             })}>
             <Icon name="pencil" size={14} color={corrected ? t.saving : t.textSecondary} />
             <Txt variant="label" color={corrected ? t.saving : t.textSecondary}>
-              {corrected ? 'Valeurs corrigées' : 'Ces valeurs sont fausses ?'}
+              {corrected
+                ? 'Valeurs corrigées'
+                : loaded.verified
+                  ? 'Ajuster les valeurs'
+                  : 'Ces valeurs sont fausses ?'}
             </Txt>
             <Icon
               name={showCorrection ? 'close' : 'chevronRight'}
@@ -331,8 +368,9 @@ export default function PortionScreen() {
           {showCorrection && (
             <View style={{ gap: Spacing.three }}>
               <Txt variant="caption" muted>
-                OpenFoodFacts est alimenté par ses contributeurs. Recopie l&apos;étiquette{' '}
-                {referenceLabel} si elle ne correspond pas.
+                {loaded.verified
+                  ? `Valeurs CIQUAL (ANSES), mesurées en laboratoire. Tu peux les remplacer par celles de ton étiquette, ${referenceLabel}.`
+                  : `OpenFoodFacts est alimenté par ses contributeurs. Recopie l'étiquette ${referenceLabel} si elle ne correspond pas.`}
               </Txt>
               <Row gap={Spacing.three} style={{ alignItems: 'flex-start' }}>
                 <NumberBox

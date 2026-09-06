@@ -21,8 +21,6 @@ const FIELDS = [
   'serving_quantity',
   'nutriments',
   'nutrition_data_per',
-  'completeness',
-  'unique_scans_n',
 ].join(',');
 
 export type OffProduct = {
@@ -38,17 +36,7 @@ export type OffProduct = {
   /** Taille d'une portion en g/ml quand OFF la connaît (ex. 30 g). */
   servingSize?: number;
   servingLabel?: string;
-  /**
-   * Indice de complétude de la fiche OpenFoodFacts (0 à ~1,1). Une fiche à 0,2
-   * n'a souvent qu'un nom et une valeur énergétique saisis à la va-vite.
-   */
-  completeness?: number;
-  /** Nombre de scans uniques : une fiche très scannée a été relue par du monde. */
-  scans?: number;
 };
-
-/** Seuil au-delà duquel on considère la fiche sérieusement renseignée. */
-export const WELL_DOCUMENTED = 0.5;
 
 type RawProduct = Record<string, any>;
 
@@ -106,8 +94,6 @@ export function parseProduct(p: RawProduct): OffProduct | null {
     baseUnit,
     servingSize: num(p.serving_quantity),
     servingLabel: text(p.serving_size),
-    completeness: num(p.completeness),
-    scans: num(p.unique_scans_n),
   };
 }
 

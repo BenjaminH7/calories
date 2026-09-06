@@ -12,12 +12,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
 import { ModalHeader } from '@/components/ModalHeader';
-import { Card, Chip, Row, SectionTitle, Txt } from '@/components/ui';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
-import { searchProducts, WELL_DOCUMENTED, type OffProduct } from '@/lib/openfoodfacts';
+import { searchGenericFoods } from '@/lib/generic-foods';
+import { searchProducts, type OffProduct } from '@/lib/openfoodfacts';
 import type { Meal } from '@/store/types';
 import { recentFoods, useAppStore } from '@/store/useAppStore';
 
@@ -37,7 +39,6 @@ export default function AddScreen() {
   const [results, setResults] = useState<OffProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [onlyComplete, setOnlyComplete] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -74,12 +75,8 @@ export default function AddScreen() {
 
   const showRecents = query.trim().length < 3;
 
-  // Filtre optionnel : les fiches à peine renseignées noient les bonnes.
-  const visible = useMemo(
-    () => (onlyComplete ? results.filter((p) => (p.completeness ?? 0) >= WELL_DOCUMENTED) : results),
-    [results, onlyComplete],
-  );
-  const hidden = results.length - visible.length;
+  // Aliments bruts : table CIQUAL locale, instantanée, une entrée par aliment.
+  const generic = useMemo(() => searchGenericFoods(query.trim()), [query]);
 
   return (
     <View style={{ flex: 1, paddingTop: topInset }}>
@@ -117,7 +114,7 @@ export default function AddScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Rechercher dans OpenFoodFacts…"
+            placeholder="Poulet, riz, huile d'olive…"
             placeholderTextColor={t.textSecondary}
             autoCorrect={false}
             returnKeyType="search"
@@ -139,7 +136,7 @@ export default function AddScreen() {
       </View>
 
       <FlatList
-        data={showRecents ? [] : visible}
+        data={showRecents ? [] : results}
         keyExtractor={(item, i) => `${item.barcode}-${i}`}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
@@ -201,24 +198,54 @@ export default function AddScreen() {
             <Txt variant="caption" color={t.danger} style={{ marginBottom: Spacing.three }}>
               {error}
             </Txt>
-          ) : results.length > 0 ? (
-            <Row
-              gap={Spacing.three}
-              style={{ marginBottom: Spacing.three, justifyContent: 'space-between' }}>
-              <Chip
-                label="Fiches complètes"
-                selected={onlyComplete}
-                onPress={() => setOnlyComplete((v) => !v)}
-              />
-              <Txt variant="caption" muted>
-                {visible.length} résultat{visible.length > 1 ? 's' : ''}
-                {onlyComplete && hidden > 0 ? ` · ${hidden} masqué${hidden > 1 ? 's' : ''}` : ''}
-              </Txt>
-            </Row>
-          ) : null
+          ) : (
+            <View style={{ gap: Spacing.three, marginBottom: Spacing.three }}>
+              {generic.length > 0 && (
+                <>
+                  <SectionTitle>Aliments vérifiés</SectionTitle>
+                  <Card padded={false}>
+                    {generic.map((food, i) => (
+                      <Pressable
+                        key={food.id}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/add/portion',
+                            params: { genericId: food.id, day, meal },
+                          })
+                        }
+                        style={({ pressed }) => ({
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: Spacing.three,
+                          padding: Spacing.four,
+                          borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                          borderTopColor: t.border,
+                          opacity: pressed ? 0.6 : 1,
+                        })}>
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <Txt variant="heading" style={{ fontSize: 15 }} numberOfLines={1}>
+                            {food.name}
+                          </Txt>
+                          <Txt variant="caption" muted numberOfLines={1}>
+                            {food.kcal} kcal · {food.protein} g prot. / 100 {food.unit}
+                          </Txt>
+                          <VerifiedBadge compact />
+                        </View>
+                        <Icon name="chevronRight" size={16} color={t.textSecondary} />
+                      </Pressable>
+                    ))}
+                  </Card>
+                </>
+              )}
+
+              {results.length > 0 && (
+                <SectionTitle>Produits emballés · OpenFoodFacts</SectionTitle>
+              )}
+            </View>
+          )
         }
         ListEmptyComponent={
-          showRecents || loading ? null : (
+          showRecents || loading || generic.length > 0 ? null : (
             <Card style={{ alignItems: 'center', paddingVertical: Spacing.six, gap: Spacing.three }}>
               <Txt variant="body" muted style={{ textAlign: 'center' }}>
                 Aucun résultat pour « {query.trim()} ».
@@ -256,37 +283,12 @@ export default function AddScreen() {
                 {item.brand ? `${item.brand} · ` : ''}
                 {item.kcalPer100} kcal · {item.proteinPer100} g prot. / 100 {item.baseUnit}
               </Txt>
-              <Quality product={item} />
             </View>
             <Icon name="chevronRight" size={16} color={t.textSecondary} />
           </Pressable>
         )}
       />
     </View>
-  );
-}
-
-/**
- * Signal de fiabilité d'une fiche OpenFoodFacts. La base est contributive :
- * beaucoup de fiches n'ont qu'un nom et une valeur énergétique saisis à la
- * hâte, d'autres sont relues par des milliers de scans.
- */
-function Quality({ product }: { product: OffProduct }) {
-  const t = useTheme();
-  const complete = (product.completeness ?? 0) >= WELL_DOCUMENTED;
-  const scans = product.scans ?? 0;
-
-  const color = complete ? t.proteinDone : t.textSecondary;
-  const label = complete ? 'fiche complète' : 'fiche peu renseignée';
-
-  return (
-    <Row gap={Spacing.one} style={{ marginTop: 2 }}>
-      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
-      <Txt variant="caption" color={color} style={{ fontSize: 10 }}>
-        {label}
-        {scans > 0 ? ` · ${scans} scan${scans > 1 ? 's' : ''}` : ''}
-      </Txt>
-    </Row>
   );
 }
 
