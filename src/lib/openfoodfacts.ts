@@ -1,3 +1,4 @@
+import { basisForUnit } from '@/lib/units';
 import type { NutritionBasis, Unit } from '@/store/types';
 
 /**
@@ -98,39 +99,29 @@ export async function fetchByBarcode(barcode: string, signal?: AbortSignal): Pro
   return parseProduct({ ...json.product, code: json.code ?? barcode });
 }
 
+/**
+ * Recherche texte. L'ancien endpoint `cgi/search.pl` de world.openfoodfacts.org
+ * renvoie désormais des 503 : on passe par search-a-licious, le service de
+ * recherche officiel. Le tri par défaut (pertinence) donne de bien meilleurs
+ * résultats que le tri par popularité, qui remonte des produits hors sujet.
+ */
 export async function searchProducts(query: string, signal?: AbortSignal): Promise<OffProduct[]> {
   const url =
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}` +
-    `&search_simple=1&action=process&json=1&page_size=25&fields=${FIELDS}`;
+    `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}` +
+    `&page_size=50&fields=${FIELDS}`;
   const json = await offFetch(url, signal);
-  const products: RawProduct[] = json?.products ?? [];
+  const products: RawProduct[] = json?.hits ?? [];
   return products.map(parseProduct).filter((p): p is OffProduct => p !== null && p.kcalPer100 > 0);
 }
 
-/** Convertit un produit OFF en base de calcul pour une unité donnée. */
+/** Convertit un produit OFF en base de calcul pour une unité de saisie. */
 export function basisFor(product: OffProduct, unit: Unit): NutritionBasis {
-  if (unit === 'serving' && product.servingSize) {
-    const ratio = product.servingSize / 100;
-    return {
-      kcal: Math.round(product.kcalPer100 * ratio * 10) / 10,
-      protein: Math.round(product.proteinPer100 * ratio * 10) / 10,
-      per: 1,
-      unit: 'serving',
-    };
-  }
-  return {
-    kcal: product.kcalPer100,
-    protein: product.proteinPer100,
-    per: 100,
-    unit: unit === 'serving' ? product.baseUnit : unit,
-  };
+  return basisForUnit(
+    { kcal: product.kcalPer100, protein: product.proteinPer100 },
+    product.baseUnit,
+    unit,
+    product.servingSize,
+  );
 }
 
-/** Totaux consommés pour une quantité donnée. */
-export function totalsFor(basis: NutritionBasis, quantity: number) {
-  const factor = quantity / basis.per;
-  return {
-    kcal: Math.round(basis.kcal * factor),
-    protein: Math.round(basis.protein * factor * 10) / 10,
-  };
-}
+export { totalsFor } from '@/lib/units';

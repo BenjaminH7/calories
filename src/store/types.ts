@@ -5,12 +5,27 @@ export type Activity = keyof typeof ACTIVITY_FACTORS;
 export type Sex = 'male' | 'female';
 export type Goal = 'lose' | 'maintain' | 'gain';
 
-/** Unités de saisie. `g`/`ml` sont ramenées à une base 100. */
-export type Unit = 'g' | 'ml' | 'piece' | 'serving';
+/**
+ * Unités de saisie. `g`/`ml` sont ramenées à une base 100 ; les autres sont
+ * des unités « à la pièce » dont la valeur nutritionnelle vaut pour 1.
+ */
+export type Unit = 'g' | 'ml' | 'tbsp' | 'tsp' | 'piece' | 'serving';
 
 export const UNIT_LABELS: Record<Unit, string> = {
   g: 'g',
   ml: 'ml',
+  tbsp: 'c. à soupe',
+  tsp: 'c. à café',
+  piece: 'pièce',
+  serving: 'portion',
+};
+
+/** Libellé court, pour les endroits où la place manque. */
+export const UNIT_SHORT: Record<Unit, string> = {
+  g: 'g',
+  ml: 'ml',
+  tbsp: 'c.à.s',
+  tsp: 'c.à.c',
   piece: 'pièce',
   serving: 'portion',
 };

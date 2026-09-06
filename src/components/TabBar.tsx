@@ -53,7 +53,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
             navigation.navigate(route.name, route.params);
           }
         }}
-        style={{ flex, alignItems: 'center', gap: 3, paddingTop: Spacing.two }}>
+        style={{ flex, alignItems: 'center', gap: 3, paddingTop: Spacing.one }}>
         <Icon name={ICONS[routeName]} size={22} color={focused ? t.text : t.textSecondary} />
         <Txt variant="caption" color={focused ? t.text : t.textSecondary} style={{ fontSize: 10.5 }}>
           {LABELS[routeName]}
@@ -70,8 +70,10 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         backgroundColor: t.card,
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: t.border,
-        paddingBottom: insets.bottom || Spacing.three,
-        height: TAB_BAR_HEIGHT + (insets.bottom || Spacing.three),
+        // Sans encoche (insets.bottom = 0) on garde une petite marge, sinon la
+        // barre colle au bord de l'écran.
+        paddingBottom: insets.bottom || Spacing.two,
+        height: TAB_BAR_HEIGHT + (insets.bottom || Spacing.two),
         paddingHorizontal: Spacing.two,
       }}>
       {renderTab('index')}

@@ -20,7 +20,7 @@ import { Button, Card, Row, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
-import { totalsFor } from '@/lib/openfoodfacts';
+import { basisForUnit, equivalentLabel, totalsFor } from '@/lib/units';
 import { defaultMeal, UNIT_LABELS, type Meal, type NutritionBasis, type Unit } from '@/store/types';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -49,7 +49,10 @@ export default function ManualScreen() {
   const [name, setName] = useState(params.name ?? '');
   const [meal, setMeal] = useState<Meal>(params.meal ?? defaultMeal());
   const [source, setSource] = useState<Source | null>(null);
-  const [unit, setUnit] = useState<Unit>('g');
+  // `unit` = unité de l'étiquette (g/ml) ; `qtyUnit` = unité de saisie de la
+  // quantité mangée, qui peut être une cuillère.
+  const [unit, setUnit] = useState<'g' | 'ml'>('g');
+  const [qtyUnit, setQtyUnit] = useState<Unit>('g');
   const [quantity, setQuantity] = useState(100);
   const [kcalInput, setKcalInput] = useState('');
   const [proteinInput, setProteinInput] = useState('');
@@ -59,7 +62,7 @@ export default function ManualScreen() {
 
   const basis: NutritionBasis =
     source === 'label'
-      ? { kcal, protein, per: 100, unit }
+      ? basisForUnit({ kcal, protein }, unit, qtyUnit)
       : { kcal, protein, per: 1, unit: 'serving' };
 
   const totals = source === 'label' ? totalsFor(basis, quantity) : { kcal, protein };
@@ -163,10 +166,13 @@ export default function ManualScreen() {
           <>
             <Step number={4} title={`Sur l'étiquette, pour 100 ${UNIT_LABELS[unit]}`}>
               <Row gap={Spacing.two}>
-                {(['g', 'ml'] as Unit[]).map((u) => (
+                {(['g', 'ml'] as const).map((u) => (
                   <Pressable
                     key={u}
-                    onPress={() => setUnit(u)}
+                    onPress={() => {
+                      setUnit(u);
+                      if (qtyUnit === 'g' || qtyUnit === 'ml') setQtyUnit(u);
+                    }}
                     style={{
                       flex: 1,
                       alignItems: 'center',
@@ -197,10 +203,14 @@ export default function ManualScreen() {
             <Step number={5} title="Tu en as mangé combien ?">
               <QuantityField
                 quantity={quantity}
-                unit={unit}
-                units={[]}
+                unit={qtyUnit}
+                units={[unit, 'tbsp', 'tsp']}
+                equivalent={equivalentLabel(qtyUnit, quantity, unit)}
                 onChangeQuantity={setQuantity}
-                onChangeUnit={setUnit}
+                onChangeUnit={(next) => {
+                  setQtyUnit(next);
+                  setQuantity(next === 'g' || next === 'ml' ? 100 : 1);
+                }}
               />
             </Step>
           </>

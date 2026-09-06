@@ -39,8 +39,16 @@ l'ajout directement dans ce repas.
   la voie choisie s'affichent.
 
 L'écran de portion (`src/app/add/portion.tsx`) sert aussi à modifier une
-entrée existante : champ numérique large, boutons ±, bascule g / ml / portion
-et raccourcis (30, 50, 100, 150 g…).
+entrée existante : champ numérique large, boutons ±, bascule d'unité et
+raccourcis (30, 50, 100, 150 g…).
+
+**Unités** — g, ml, cuillère à soupe, cuillère à café, et portion quand
+OpenFoodFacts en connaît la taille. Les cuillères sont des mesures de volume
+(15 ml et 5 ml) ; quand l'étiquette est au poids, la conversion passe par une
+densité de 0,92 g/ml (celle des huiles, cas de loin le plus fréquent pour une
+saisie à la cuillère). L'équivalence est toujours affichée sous la quantité
+(« ≈ 13,8 g »), donc l'approximation reste visible et on peut basculer en
+grammes pour être exact. Voir [`src/lib/units.ts`](src/lib/units.ts).
 
 **Corriger OpenFoodFacts** — la base est contributive et parfois fausse. Sur la
 fiche produit, « Ces valeurs sont fausses ? » ouvre deux champs pour recopier
@@ -59,6 +67,12 @@ Exemple avec 2000 kcal/jour, un resto à +1000 kcal étalé sur 7 jours :
 | --- | --- | --- |
 | J-7 → J-1 | 1855 kcal | +145 kcal / jour |
 | Jour J | 3000 kcal | 1000 kcal débloquées |
+
+**Export** — Réglages → « Exporter mon journal ». On choisit une période (7 / 14
+/ 30 / 90 jours) et un format, puis on copie ou on partage. Le Markdown est
+pensé pour être collé tel quel dans une conversation avec un LLM : profil,
+objectifs, résumé de la période, puis le détail repas par repas. Le JSON sert
+quand le modèle doit calculer dessus. Voir [`src/lib/export.ts`](src/lib/export.ts).
 
 ## Widget iOS (écran d'accueil)
 

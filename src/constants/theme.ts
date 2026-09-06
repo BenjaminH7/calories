@@ -80,4 +80,8 @@ export const Radius = {
   pill: 999,
 } as const;
 
-export const TAB_BAR_HEIGHT = 64;
+/**
+ * Hauteur de la zone d'onglets, hors marge de sécurité du bas. Calée sur le
+ * contenu réel : 4 (padding) + 22 (icône) + 3 (écart) + 16 (libellé).
+ */
+export const TAB_BAR_HEIGHT = 50;

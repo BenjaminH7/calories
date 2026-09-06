@@ -13,7 +13,8 @@ import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
-import { basisFor, fetchByBarcode, totalsFor, type OffProduct } from '@/lib/openfoodfacts';
+import { basisFor, fetchByBarcode, type OffProduct } from '@/lib/openfoodfacts';
+import { basisForUnit, equivalentLabel, isPerOne, referenceLabelFor, totalsFor } from '@/lib/units';
 import { defaultMeal, UNIT_LABELS, type Meal, type NutritionBasis, type Unit } from '@/store/types';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -74,8 +75,11 @@ export default function PortionScreen() {
   // Entrée existante (modification ou ré-ajout) : tout vient du store.
   useEffect(() => {
     if (!sourceEntry) return;
+    // Base au poids/volume : on peut aussi saisir à la cuillère.
     const units: Unit[] =
-      sourceEntry.basis.per === 1 ? [sourceEntry.basis.unit] : ['g', 'ml'];
+      sourceEntry.basis.per === 1
+        ? [sourceEntry.basis.unit]
+        : [sourceEntry.basis.unit, 'tbsp', 'tsp'];
     setLoaded({
       name: sourceEntry.name,
       brand: sourceEntry.brand,
@@ -108,7 +112,9 @@ export default function PortionScreen() {
           setError('inconnu');
           return;
         }
-        const units: Unit[] = ['g', 'ml'];
+        // On propose toujours les cuillères : huiles, sauces, miel, purées
+        // d'oléagineux se dosent rarement à la balance.
+        const units: Unit[] = [product.baseUnit, 'tbsp', 'tsp'];
         if (product.servingSize) units.push('serving');
         const startUnit = product.baseUnit;
         setLoaded({
@@ -158,28 +164,38 @@ export default function PortionScreen() {
       return basisFor(product, unit);
     }
 
-    // Entrée manuelle ou récente : on garde la base, seule l'unité d'affichage change.
-    return {
+    // Entrée manuelle ou récente. Une base « à la pièce » n'est pas
+    // convertible ; une base pour 100 g/ml l'est, cuillères comprises.
+    const ref = {
       kcal: corrected ? parseNumber(kcalRef) : loaded.basis.kcal,
       protein: corrected ? parseNumber(proteinRef) : loaded.basis.protein,
-      per: loaded.basis.per,
-      unit: loaded.basis.per === 1 ? loaded.basis.unit : unit,
     };
+    if (loaded.basis.per === 1) return { ...ref, per: 1, unit: loaded.basis.unit };
+    return basisForUnit(ref, loaded.basis.unit as 'g' | 'ml', unit);
   }, [loaded, unit, corrected, kcalRef, proteinRef]);
 
-  /** Unité de référence de la correction : toujours la base 100 g/ml du produit. */
-  const referenceLabel = loaded?.product
-    ? `pour 100 ${UNIT_LABELS[loaded.product.baseUnit]}`
-    : loaded?.basis.per === 1
+  /** Unité dans laquelle sont exprimées les valeurs de référence. */
+  const baseUnit: 'g' | 'ml' =
+    loaded?.product?.baseUnit ?? (loaded?.basis.unit === 'ml' ? 'ml' : 'g');
+
+  /** Libellé de la correction : toujours la base 100 g/ml, jamais la cuillère. */
+  const referenceLabel =
+    loaded?.basis.per === 1 && !loaded.product
       ? `par ${UNIT_LABELS[loaded.basis.unit]}`
-      : `pour 100 ${UNIT_LABELS[unit]}`;
+      : `pour 100 ${UNIT_LABELS[baseUnit]}`;
 
   const totals = basis ? totalsFor(basis, quantity) : { kcal: 0, protein: 0 };
+  const equivalent = equivalentLabel(unit, quantity, baseUnit, loaded?.product?.servingSize);
 
   const onChangeUnit = (next: Unit) => {
+    const previous = unit;
     setUnit(next);
-    if (next === 'serving' && loaded?.product?.servingSize) setQuantity(1);
-    else if (unit === 'serving') setQuantity(loaded?.product?.servingSize ?? 100);
+    // Chaque unité a son ordre de grandeur : repartir de 100 g après avoir
+    // choisi « c. à soupe » n'aurait aucun sens.
+    if (isPerOne(next) && !isPerOne(previous)) setQuantity(1);
+    else if (!isPerOne(next) && isPerOne(previous)) {
+      setQuantity(loaded?.product?.servingSize ?? 100);
+    }
   };
 
   const save = () => {
@@ -257,8 +273,7 @@ export default function PortionScreen() {
     );
   }
 
-  const perLabel =
-    basis.per === 1 ? `par ${UNIT_LABELS[basis.unit]}` : `pour 100 ${UNIT_LABELS[basis.unit]}`;
+  const perLabel = referenceLabelFor(basis);
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
@@ -376,6 +391,7 @@ export default function PortionScreen() {
             units={loaded.units}
             onChangeQuantity={setQuantity}
             onChangeUnit={onChangeUnit}
+            equivalent={equivalent}
           />
         </Card>
 

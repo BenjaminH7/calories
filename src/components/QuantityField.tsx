@@ -11,11 +11,20 @@ import { UNIT_LABELS, type Unit } from '@/store/types';
 const PRESETS: Record<Unit, number[]> = {
   g: [30, 50, 100, 150, 200, 250],
   ml: [100, 150, 200, 250, 330, 500],
+  tbsp: [0.5, 1, 2, 3],
+  tsp: [0.5, 1, 2, 3],
   piece: [1, 2, 3, 4],
   serving: [0.5, 1, 1.5, 2],
 };
 
-const STEPS: Record<Unit, number> = { g: 10, ml: 10, piece: 1, serving: 0.5 };
+const STEPS: Record<Unit, number> = {
+  g: 10,
+  ml: 10,
+  tbsp: 0.5,
+  tsp: 0.5,
+  piece: 1,
+  serving: 0.5,
+};
 
 /**
  * Saisie de quantité : gros champ numérique, ± , unités et raccourcis.
@@ -27,12 +36,15 @@ export function QuantityField({
   units,
   onChangeQuantity,
   onChangeUnit,
+  equivalent,
 }: {
   quantity: number;
   unit: Unit;
   units: Unit[];
   onChangeQuantity: (value: number) => void;
   onChangeUnit: (unit: Unit) => void;
+  /** Équivalence affichée sous le champ, ex. « ≈ 13,8 g » pour 1 c. à soupe. */
+  equivalent?: string | null;
 }) {
   const t = useTheme();
   const step = STEPS[unit];
@@ -90,8 +102,14 @@ export function QuantityField({
         <RoundButton onPress={() => bump(step)} icon="plus" />
       </Row>
 
+      {equivalent ? (
+        <Txt variant="caption" muted style={{ textAlign: 'center', marginTop: -Spacing.two }}>
+          {equivalent}
+        </Txt>
+      ) : null}
+
       {units.length > 1 && (
-        <Row gap={Spacing.two}>
+        <Row gap={Spacing.two} style={{ flexWrap: 'wrap' }}>
           {units.map((u) => (
             <Chip
               key={u}
