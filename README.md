@@ -33,7 +33,8 @@ l'ajout directement dans ce repas.
 (pré-sélectionné selon l'heure) :
 
 - scan d'un code-barres (EAN/UPC) → fiche OpenFoodFacts ;
-- recherche texte dans OpenFoodFacts ;
+- recherche texte : une seule liste, où les aliments de la table CIQUAL
+  (portant une pastille verte) précèdent les fiches OpenFoodFacts ;
 - saisie manuelle, en quatre ou cinq étapes numérotées : nom, repas, puis
   « le total du plat » ou « une étiquette pour 100 g/ml » — seuls les champs de
   la voie choisie s'affichent.
@@ -49,6 +50,24 @@ densité de 0,92 g/ml (celle des huiles, cas de loin le plus fréquent pour une
 saisie à la cuillère). L'équivalence est toujours affichée sous la quantité
 (« ≈ 13,8 g »), donc l'approximation reste visible et on peut basculer en
 grammes pour être exact. Voir [`src/lib/units.ts`](src/lib/units.ts).
+
+## Deux sources de données
+
+**CIQUAL (ANSES)** pour les aliments bruts — poulet, riz, huile d'olive, œuf.
+105 entrées curées, mesurées en laboratoire, embarquées dans l'app : la
+recherche est instantanée et hors-ligne, et il n'y a **qu'une entrée par
+aliment**. C'est ce que marque la pastille verte.
+
+La table est générée depuis le jeu XML officiel (Licence Ouverte / Etalab) vers
+[`src/data/generic-foods.ts`](src/data/generic-foods.ts) ; elle n'est pas
+éditée à la main. Chaque valeur retenue a été contrôlée par recoupement Atwater
+(4 kcal/g de protéines et de glucides, 9 pour les lipides) avec l'énergie
+annoncée. Les liquides — huiles, laits — sont convertis de « pour 100 g » vers
+« pour 100 ml » avec leur densité réelle, faute de quoi une cuillère d'huile
+serait surestimée de 9 %.
+
+**OpenFoodFacts** pour les produits emballés, où l'étiquette du fabricant est
+la vérité et où le code-barres est la bonne clé d'entrée.
 
 **Corriger OpenFoodFacts** — la base est contributive et parfois fausse. Sur la
 fiche produit, « Ces valeurs sont fausses ? » ouvre deux champs pour recopier
