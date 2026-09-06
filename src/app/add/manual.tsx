@@ -9,7 +9,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
 import { MealPicker } from '@/components/MealPicker';
@@ -18,6 +17,7 @@ import { NumberBox, parseNumber } from '@/components/NumberBox';
 import { QuantityField } from '@/components/QuantityField';
 import { Button, Card, Row, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
 import { basisForUnit, equivalentLabel, totalsFor } from '@/lib/units';
@@ -35,7 +35,7 @@ type Source = 'total' | 'label';
 export default function ManualScreen() {
   const t = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const topInset = useModalTopInset();
   const params = useLocalSearchParams<{
     day?: string;
     name?: string;
@@ -87,7 +87,7 @@ export default function ManualScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, paddingTop: insets.top + Spacing.three }}
+      style={{ flex: 1, paddingTop: topInset }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Spacing.four}>
       <ModalHeader title="Saisie manuelle" subtitle={humanDay(day)} />

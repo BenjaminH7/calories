@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModalHeader } from '@/components/ModalHeader';
 import { Button, Card, Chip, Row, SectionTitle, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, daysBetween, humanDay, shortDate, today, type DayKey } from '@/lib/date';
 import { useAppStore } from '@/store/useAppStore';
@@ -26,7 +26,7 @@ const SPREADS = [3, 5, 7, 10, 14, 21, 30];
 export default function NewEventScreen() {
   const t = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const topInset = useModalTopInset();
   const addEvent = useAppStore((s) => s.addEvent);
   const calorieGoal = useAppStore((s) => s.calorieGoal);
 
@@ -73,7 +73,7 @@ export default function NewEventScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, paddingTop: insets.top + Spacing.three }}
+      style={{ flex: 1, paddingTop: topInset }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ModalHeader title="Nouvel événement" subtitle="Épargne de calories" />
 

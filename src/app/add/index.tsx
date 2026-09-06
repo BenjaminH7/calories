@@ -14,6 +14,7 @@ import { Icon } from '@/components/Icon';
 import { ModalHeader } from '@/components/ModalHeader';
 import { Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
 import { searchProducts, type OffProduct } from '@/lib/openfoodfacts';
@@ -24,6 +25,7 @@ export default function AddScreen() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = useModalTopInset();
   const params = useLocalSearchParams<{ day?: string; meal?: Meal }>();
   const day = params.day ?? today();
   const meal = params.meal;
@@ -72,7 +74,7 @@ export default function AddScreen() {
   const showRecents = query.trim().length < 3;
 
   return (
-    <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
+    <View style={{ flex: 1, paddingTop: topInset }}>
       <ModalHeader title="Ajouter un aliment" subtitle={humanDay(day)} />
 
       <View style={{ paddingHorizontal: Spacing.five, gap: Spacing.four }}>

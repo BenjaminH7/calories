@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalHeader } from '@/components/ModalHeader';
 import { Button, Card, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
+import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { today } from '@/lib/date';
 import type { Meal } from '@/store/types';
@@ -19,6 +20,7 @@ export default function ScanScreen() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = useModalTopInset();
   const params = useLocalSearchParams<{ day?: string; meal?: Meal }>();
   const day = params.day ?? today();
   const meal = params.meal;
@@ -41,7 +43,7 @@ export default function ScanScreen() {
 
   if (!permission.granted) {
     return (
-      <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
+      <View style={{ flex: 1, paddingTop: topInset }}>
         <ModalHeader title="Scanner" />
         <View style={{ padding: Spacing.five, gap: Spacing.four }}>
           <Card style={{ gap: Spacing.three }}>
@@ -72,7 +74,7 @@ export default function ScanScreen() {
         onBarcodeScanned={onScanned}
       />
 
-      <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
+      <View style={{ flex: 1, paddingTop: topInset }}>
         <ModalHeader title="" />
 
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

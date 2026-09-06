@@ -2,7 +2,6 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
 import { MealPicker } from '@/components/MealPicker';
@@ -11,6 +10,7 @@ import { NumberBox, parseNumber } from '@/components/NumberBox';
 import { QuantityField } from '@/components/QuantityField';
 import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
+import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { humanDay, today } from '@/lib/date';
 import { basisFor, fetchByBarcode, type OffProduct } from '@/lib/openfoodfacts';
@@ -36,7 +36,7 @@ type Loaded = {
 export default function PortionScreen() {
   const t = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const topInset = useModalTopInset();
   const params = useLocalSearchParams<{
     barcode?: string;
     entryId?: string;
@@ -234,7 +234,7 @@ export default function PortionScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
+      <View style={{ flex: 1, paddingTop: topInset }}>
         <ModalHeader title="Chargement…" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={t.textSecondary} />
@@ -245,7 +245,7 @@ export default function PortionScreen() {
 
   if (error || !loaded || !basis) {
     return (
-      <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
+      <View style={{ flex: 1, paddingTop: topInset }}>
         <ModalHeader title="Produit introuvable" />
         <View style={{ padding: Spacing.five, gap: Spacing.four }}>
           <Card style={{ gap: Spacing.two }}>
@@ -276,7 +276,7 @@ export default function PortionScreen() {
   const perLabel = referenceLabelFor(basis);
 
   return (
-    <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
+    <View style={{ flex: 1, paddingTop: topInset }}>
       <ModalHeader
         title={isEditing ? 'Modifier la quantité' : 'Quelle quantité ?'}
         subtitle={humanDay(day)}

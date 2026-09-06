@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalHeader } from '@/components/ModalHeader';
 import { Button, Card, Chip, Row, SectionTitle, Txt } from '@/components/ui';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { useModalTopInset } from '@/hooks/use-modal-inset';
 import { useTheme } from '@/hooks/use-theme';
 import { buildExport, loggedDayCount, type ExportFormat, type ExportInput } from '@/lib/export';
 import { useAppStore } from '@/store/useAppStore';
@@ -25,6 +26,7 @@ const RANGES = [
 export default function ExportScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useModalTopInset();
 
   const entries = useAppStore((s) => s.entries);
   const events = useAppStore((s) => s.events);
@@ -50,7 +52,7 @@ export default function ExportScreen() {
   const share = () => Share.share({ message: content });
 
   return (
-    <View style={{ flex: 1, paddingTop: insets.top + Spacing.three }}>
+    <View style={{ flex: 1, paddingTop: topInset }}>
       <ModalHeader title="Exporter mon journal" subtitle="Pour l'envoyer à ton LLM" />
 
       <ScrollView
