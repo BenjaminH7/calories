@@ -42,6 +42,13 @@ L'écran de portion (`src/app/add/portion.tsx`) sert aussi à modifier une
 entrée existante : champ numérique large, boutons ±, bascule g / ml / portion
 et raccourcis (30, 50, 100, 150 g…).
 
+**Corriger OpenFoodFacts** — la base est contributive et parfois fausse. Sur la
+fiche produit, « Ces valeurs sont fausses ? » ouvre deux champs pour recopier
+l'étiquette. La correction porte toujours sur les valeurs pour 100 g/ml, donc
+la conversion en portion reste juste. Elle est mémorisée avec l'entrée : au
+prochain scan du même code-barres, l'app repart de la valeur corrigée plutôt
+que de celle d'OpenFoodFacts.
+
 **Épargne** — on crée un événement (« Restaurant samedi, +1000 kcal »), on
 choisit sur combien de jours étaler l'effort, et l'objectif quotidien baisse
 automatiquement d'ici là. Le jour J, le budget est débloqué en une fois.
