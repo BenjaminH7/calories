@@ -5,22 +5,36 @@ import { Row, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { daysBetween, humanDay, shortDate, type DayKey } from '@/lib/date';
-import { dailySaving, savedSoFar, savingStart, type DayAdjustment } from '@/lib/nutrition';
+import { dailySaving, realSavedSoFar, savingStart, type DayAdjustment } from '@/lib/nutrition';
 import type { CalorieEvent } from '@/store/types';
 
 /**
  * Bandeau affiché sur l'accueil : soit « tu épargnes X kcal aujourd'hui »,
  * soit « c'est le jour J, +X kcal débloquées ».
+ *
+ * Quand une dette est active, le prélèvement du jour est gelé (pas de
+ * double effort) : on l'affiche en pause plutôt que d'annoncer un montant
+ * qui n'a pas vraiment été retiré. Le total « déjà mis de côté » reste
+ * honnête — un jour gelé n'y contribue jamais, même rétroactivement.
  */
 export function SavingBanner({
   adjustment,
   day,
   upcoming,
+  frozen,
+  totalsFor,
+  baseGoal,
+  events,
 }: {
   adjustment: DayAdjustment;
   day: DayKey;
   /** Événements créés dont la fenêtre d'épargne n'a pas encore commencé. */
   upcoming?: CalorieEvent[];
+  /** Dette active aujourd'hui : le prélèvement du jour est gelé. */
+  frozen: boolean;
+  totalsFor: (d: DayKey) => number;
+  baseGoal: number;
+  events: CalorieEvent[];
 }) {
   const t = useTheme();
   const router = useRouter();
@@ -61,7 +75,7 @@ export function SavingBanner({
 
   const isEventDay = adjustment.happeningToday.length > 0;
   const daysLeft = daysBetween(day, event.date);
-  const saved = savedSoFar(event, day);
+  const saved = realSavedSoFar(totalsFor, baseGoal, events, event, day);
   const ratio = Math.min(saved / Math.max(1, event.budget), 1);
 
   return (
@@ -95,12 +109,20 @@ export function SavingBanner({
 
         {!isEventDay && (
           <View style={{ alignItems: 'flex-end' }}>
-            <Txt variant="heading" color={t.saving}>
-              −{dailySaving(event, day)}
-            </Txt>
-            <Txt variant="caption" muted>
-              kcal aujourd&apos;hui
-            </Txt>
+            {frozen ? (
+              <Txt variant="heading" color={t.textSecondary}>
+                En pause
+              </Txt>
+            ) : (
+              <>
+                <Txt variant="heading" color={t.saving}>
+                  −{dailySaving(event, day)}
+                </Txt>
+                <Txt variant="caption" muted>
+                  kcal aujourd&apos;hui
+                </Txt>
+              </>
+            )}
           </View>
         )}
       </Row>
@@ -125,6 +147,7 @@ export function SavingBanner({
           </View>
           <Txt variant="caption" muted>
             {Math.round(saved)} / {event.budget} kcal déjà mis de côté
+            {frozen ? ' · gelé le temps du rééquilibrage' : ''}
             {adjustment.savingFor.length > 1
               ? ` · +${adjustment.savingFor.length - 1} autre événement`
               : ''}

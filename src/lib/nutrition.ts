@@ -200,13 +200,22 @@ export function safeGoalFloor(baseGoal: number): number {
   return Math.min(baseGoal, Math.max(MIN_SAFE_DAILY_CALORIES, percentFloor));
 }
 
-/** Objectif calorique effectif du jour, épargne comprise. */
+/**
+ * Objectif calorique effectif du jour, épargne comprise.
+ *
+ * `frozen` gèle le prélèvement d'épargne du jour (dette active : pas de
+ * double effort le même jour) sans jamais rattraper les jours gelés ensuite
+ * ni toucher au calendrier de l'événement — seul le prélèvement du jour
+ * s'annule, la fenêtre d'épargne reste celle prévue.
+ */
 export function effectiveCalorieGoal(
   baseGoal: number,
   events: CalorieEvent[],
   day: DayKey,
+  frozen = false,
 ): { goal: number; adjustment: DayAdjustment } {
-  const adjustment = adjustmentsFor(events, day);
+  const raw = adjustmentsFor(events, day);
+  const adjustment = frozen ? { ...raw, saved: 0 } : raw;
   const floor = safeGoalFloor(baseGoal);
   const goal = Math.max(floor, baseGoal - adjustment.saved + adjustment.released);
   return { goal, adjustment };
@@ -228,6 +237,15 @@ export const DEBT_SPREAD_DAYS = 3;
 export const DEBT_CAP = 500;
 export const DEBT_BUFFER_MIN = 150;
 export const DEBT_BUFFER_RATIO = 0.1;
+
+/**
+ * Le lissage traite un incident, pas un motif : au-delà de ce nombre de
+ * vrais dépassements sur `PATTERN_WINDOW_DAYS` jours glissants, continuer à
+ * chuchoter "c'est lissé" serait malhonnête. Le produit change alors de
+ * registre — une question plutôt qu'un chiffre.
+ */
+export const PATTERN_WINDOW_DAYS = 7;
+export const PATTERN_THRESHOLD = 3;
 
 /** Fenêtre de recalcul : largement suffisante, le plafond et la fusion des
  * dettes ramènent toujours à un état stable en quelques jours. */
@@ -263,12 +281,17 @@ export type DebtProgress = {
   remaining: number;
   /** Jours restants après aujourd'hui pour lisser `remaining`. */
   daysLeft: number;
+  /** Vrais dépassements (au-delà du tampon) sur les `PATTERN_WINDOW_DAYS` derniers jours, aujourd'hui inclus. */
+  recentOverages: number;
 };
 
 /**
  * Dette recalculée à partir de l'historique plutôt que stockée. On rejoue
  * les derniers jours en partant d'une dette nulle : le plafond et la fusion
  * des dettes effacent toute erreur d'initialisation en quelques itérations.
+ * Au passage, on compte les vrais dépassements récents : c'est ce qui
+ * distingue un incident isolé (on lisse) d'un motif (on ne lisse plus, on
+ * pose la question).
  */
 function debtProgress(
   totalsFor: (day: DayKey) => number,
@@ -277,24 +300,32 @@ function debtProgress(
   day: DayKey,
 ): DebtProgress {
   let state: DebtState = { remaining: 0, daysLeft: 0 };
+  let recentOverages = 0;
 
   for (let i = DEBT_LOOKBACK_DAYS; i >= 0; i -= 1) {
     const d = addDays(day, -i);
     const { reduction, next } = stepDebt(state);
     state = next;
 
-    if (d === day) return { today: reduction, remaining: state.remaining, daysLeft: state.daysLeft };
-
-    const epargneGoal = effectiveCalorieGoal(baseGoal, events, d).goal;
+    // La dette de `d` (`reduction > 0`) gèle l'épargne de `d` : pas de double
+    // effort le même jour.
+    const epargneGoal = effectiveCalorieGoal(baseGoal, events, d, reduction > 0).goal;
     const displayedGoal = Math.max(safeGoalFloor(baseGoal), epargneGoal - reduction);
     const overage = Math.max(0, totalsFor(d) - (displayedGoal + debtBuffer(displayedGoal)));
+    const inPatternWindow = i < PATTERN_WINDOW_DAYS;
+
+    if (d === day) {
+      if (overage > 0 && inPatternWindow) recentOverages += 1;
+      return { today: reduction, remaining: state.remaining, daysLeft: state.daysLeft, recentOverages };
+    }
 
     if (overage > 0) {
       state = { remaining: Math.min(DEBT_CAP, state.remaining + overage), daysLeft: DEBT_SPREAD_DAYS };
+      if (inPatternWindow) recentOverages += 1;
     }
   }
 
-  return { today: 0, remaining: 0, daysLeft: 0 };
+  return { today: 0, remaining: 0, daysLeft: 0, recentOverages };
 }
 
 /** Réduction de dette appliquée un jour donné. */
@@ -307,15 +338,58 @@ export function activeDebt(
   return debtProgress(totalsFor, baseGoal, events, day).today;
 }
 
+/**
+ * Ce qui a réellement été mis de côté pour un événement, jours gelés
+ * exclus. Contrairement à `savedSoFar` (formule lisse, ignore la dette),
+ * celle-ci reflète l'historique réel : un jour gelé ne contribue rien, et ce
+ * n'est jamais rattrapé ensuite — la cagnotte peut finir sous le budget
+ * nominal, affiché honnêtement plutôt que masqué par un calcul optimiste.
+ */
+export function realSavedSoFar(
+  totalsFor: (day: DayKey) => number,
+  baseGoal: number,
+  events: CalorieEvent[],
+  event: CalorieEvent,
+  day: DayKey,
+): number {
+  let total = 0;
+  for (let d = savingStart(event); d <= day && isSavingDay(event, d); d = addDays(d, 1)) {
+    if (activeDebt(totalsFor, baseGoal, events, d) <= 0) total += dailySaving(event, d);
+  }
+  return total;
+}
+
 /** Objectif du jour, épargne et dette comprises, jamais sous le plancher de sécurité. */
 export function dailyGoal(
   totalsFor: (day: DayKey) => number,
   baseGoal: number,
   events: CalorieEvent[],
   day: DayKey,
-): { goal: number; adjustment: DayAdjustment; debt: number; debtRemaining: number; debtDaysLeft: number } {
-  const { goal: epargneGoal, adjustment } = effectiveCalorieGoal(baseGoal, events, day);
+): {
+  goal: number;
+  adjustment: DayAdjustment;
+  debt: number;
+  debtRemaining: number;
+  debtDaysLeft: number;
+  /** Motif plutôt qu'incident : `PATTERN_THRESHOLD`+ vrais dépassements sur `PATTERN_WINDOW_DAYS` jours. */
+  pattern: boolean;
+} {
   const progress = debtProgress(totalsFor, baseGoal, events, day);
+  // La dette du jour gèle l'épargne du jour : pas le jour du dépassement
+  // lui-même (`progress.today` ne s'applique qu'à partir du lendemain).
+  const { goal: epargneGoal, adjustment } = effectiveCalorieGoal(
+    baseGoal,
+    events,
+    day,
+    progress.today > 0,
+  );
   const goal = Math.max(safeGoalFloor(baseGoal), epargneGoal - progress.today);
-  return { goal, adjustment, debt: progress.today, debtRemaining: progress.remaining, debtDaysLeft: progress.daysLeft };
+  return {
+    goal,
+    adjustment,
+    debt: progress.today,
+    debtRemaining: progress.remaining,
+    debtDaysLeft: progress.daysLeft,
+    pattern: progress.recentOverages >= PATTERN_THRESHOLD,
+  };
 }

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,8 +7,8 @@ import { Icon } from '@/components/Icon';
 import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { daysBetween, humanDay, shortDate, today } from '@/lib/date';
-import { adjustmentsFor, dailyGoal, dailySaving, savedSoFar, savingStart } from '@/lib/nutrition';
+import { daysBetween, humanDay, shortDate, today, type DayKey } from '@/lib/date';
+import { dailyGoal, dailySaving, realSavedSoFar, savingStart } from '@/lib/nutrition';
 import type { CalorieEvent } from '@/store/types';
 import { pastEvents, totalsForDay, upcomingEvents, useAppStore } from '@/store/useAppStore';
 
@@ -23,15 +23,20 @@ export default function EventsScreen() {
   const calorieGoal = useAppStore((s) => s.calorieGoal);
   const removeEvent = useAppStore((s) => s.removeEvent);
 
+  const totalsFor = useCallback((d: DayKey) => totalsForDay(entries, d).kcal, [entries]);
+
   const upcoming = useMemo(() => upcomingEvents(events, now), [events, now]);
   const past = useMemo(() => pastEvents(events, now), [events, now]);
-  // Même calcul que l'accueil : seuls les événements dont la fenêtre d'épargne
-  // a commencé prélèvent quelque chose aujourd'hui.
-  const savedToday = useMemo(() => adjustmentsFor(events, now).saved, [events, now]);
-  const todayGoal = useMemo(
-    () => dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, now).goal,
-    [entries, calorieGoal, events, now],
+  const todayResult = useMemo(
+    () => dailyGoal(totalsFor, calorieGoal, events, now),
+    [totalsFor, calorieGoal, events, now],
   );
+  // Une dette active gèle le prélèvement du jour : `adjustment.saved` le
+  // reflète déjà (zéro si gelé), pas la peine de recalculer à côté.
+  const savedToday = todayResult.adjustment.saved;
+  const todayGoal = todayResult.goal;
+  const frozenToday = todayResult.debt > 0;
+  const hasSavingEvent = todayResult.adjustment.savingFor.length > 0;
 
   // Événements créés mais dont l'épargne n'a pas encore démarré.
   const notStarted = useMemo(
@@ -76,13 +81,15 @@ export default function EventsScreen() {
           </View>
         </Row>
         <Txt variant="caption" muted>
-          {savedToday > 0
-            ? `Ton objectif de base (${calorieGoal} kcal) est réduit tant que l'épargne tourne.`
-            : notStarted.length > 0
-              ? `L'épargne n'a pas encore démarré : elle commencera le ${shortDate(
-                  savingStart(notStarted[0]),
-                )}, ${notStarted[0].spreadDays} jours avant « ${notStarted[0].name} ».`
-              : 'Aucune épargne en cours. Crée un événement pour commencer.'}
+          {frozenToday && hasSavingEvent
+            ? "L'épargne est en pause aujourd'hui : un rééquilibrage de dette est en cours."
+            : savedToday > 0
+              ? `Ton objectif de base (${calorieGoal} kcal) est réduit tant que l'épargne tourne.`
+              : notStarted.length > 0
+                ? `L'épargne n'a pas encore démarré : elle commencera le ${shortDate(
+                    savingStart(notStarted[0]),
+                  )}, ${notStarted[0].spreadDays} jours avant « ${notStarted[0].name} ».`
+                : 'Aucune épargne en cours. Crée un événement pour commencer.'}
         </Txt>
       </Card>
 
@@ -96,7 +103,15 @@ export default function EventsScreen() {
         <View style={{ gap: Spacing.three }}>
           <SectionTitle>À venir</SectionTitle>
           {upcoming.map((event) => (
-            <EventCard key={event.id} event={event} onDelete={() => confirmDelete(event)} />
+            <EventCard
+              key={event.id}
+              event={event}
+              onDelete={() => confirmDelete(event)}
+              totalsFor={totalsFor}
+              baseGoal={calorieGoal}
+              events={events}
+              frozenToday={frozenToday}
+            />
           ))}
         </View>
       )}
@@ -150,14 +165,30 @@ export default function EventsScreen() {
   );
 }
 
-function EventCard({ event, onDelete }: { event: CalorieEvent; onDelete: () => void }) {
+function EventCard({
+  event,
+  onDelete,
+  totalsFor,
+  baseGoal,
+  events,
+  frozenToday,
+}: {
+  event: CalorieEvent;
+  onDelete: () => void;
+  totalsFor: (d: DayKey) => number;
+  baseGoal: number;
+  events: CalorieEvent[];
+  /** Dette active aujourd'hui : le prélèvement du jour est gelé. */
+  frozenToday: boolean;
+}) {
   const t = useTheme();
   const now = today();
   const daysLeft = daysBetween(now, event.date);
   const isToday = daysLeft === 0;
-  const saved = savedSoFar(event, now);
+  const saved = realSavedSoFar(totalsFor, baseGoal, events, event, now);
   const ratio = Math.min(saved / Math.max(1, event.budget), 1);
   const savingActive = daysLeft >= 1 && daysLeft <= event.spreadDays;
+  const paused = savingActive && frozenToday;
   const perDay = savingActive ? dailySaving(event, now) : dailySaving(event);
 
   return (
@@ -205,19 +236,27 @@ function EventCard({ event, onDelete }: { event: CalorieEvent; onDelete: () => v
           <Txt variant="caption" muted>
             {Math.round(saved)} / {event.budget} kcal épargnées
           </Txt>
-          <Txt variant="caption" color={isToday ? t.proteinDone : t.saving}>
-            {isToday ? `+${event.budget} kcal débloquées` : savingActive ? `−${perDay} kcal / jour` : 'épargne à venir'}
+          <Txt variant="caption" color={isToday ? t.proteinDone : paused ? t.textSecondary : t.saving}>
+            {isToday
+              ? `+${event.budget} kcal débloquées`
+              : paused
+                ? 'en pause aujourd’hui'
+                : savingActive
+                  ? `−${perDay} kcal / jour`
+                  : 'épargne à venir'}
           </Txt>
         </Row>
       </View>
 
       {!isToday && (
         <Txt variant="caption" muted>
-          {savingActive
-            ? `Répartition sur ${event.spreadDays} jour${event.spreadDays > 1 ? 's' : ''} avant l'événement.`
-            : `Ton objectif ne bougera qu'à partir du ${shortDate(savingStart(event))}, soit ${
-                event.spreadDays
-              } jour${event.spreadDays > 1 ? 's' : ''} avant.`}
+          {paused
+            ? 'Prélèvement gelé le temps du rééquilibrage — reprise automatique, sans rattrapage.'
+            : savingActive
+              ? `Répartition sur ${event.spreadDays} jour${event.spreadDays > 1 ? 's' : ''} avant l'événement.`
+              : `Ton objectif ne bougera qu'à partir du ${shortDate(savingStart(event))}, soit ${
+                  event.spreadDays
+                } jour${event.spreadDays > 1 ? 's' : ''} avant.`}
         </Txt>
       )}
     </Card>

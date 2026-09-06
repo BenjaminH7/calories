@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -45,11 +45,13 @@ export default function TodayScreen() {
   const proteinGoal = useAppStore((s) => s.proteinGoal);
   const removeEntry = useAppStore((s) => s.removeEntry);
 
+  const totalsFor = useCallback((d: DayKey) => totalsForDay(entries, d).kcal, [entries]);
+
   const dayEntries = useMemo(() => entriesForDay(entries, day), [entries, day]);
   const totals = useMemo(() => totalsForDay(entries, day), [entries, day]);
-  const { goal, adjustment, debt, debtRemaining, debtDaysLeft } = useMemo(
-    () => dailyGoal((d) => totalsForDay(entries, d).kcal, calorieGoal, events, day),
-    [entries, calorieGoal, events, day],
+  const { goal, adjustment, debt, debtRemaining, debtDaysLeft, pattern } = useMemo(
+    () => dailyGoal(totalsFor, calorieGoal, events, day),
+    [totalsFor, calorieGoal, events, day],
   );
   const eventDays = useMemo(() => new Set(events.map((e) => e.date)), [events]);
 
@@ -59,15 +61,10 @@ export default function TodayScreen() {
   // n'est pas passé, alors qu'un gros dépassement est déjà visible.
   const tomorrowPreview = useMemo(() => {
     if (day !== today()) return { amount: 0, days: 0 };
-    const preview = dailyGoal(
-      (d) => totalsForDay(entries, d).kcal,
-      calorieGoal,
-      events,
-      addDays(day, 1),
-    );
+    const preview = dailyGoal(totalsFor, calorieGoal, events, addDays(day, 1));
     // `debtDaysLeft` compte les jours après demain : demain lui-même en fait partie.
     return { amount: preview.debt, days: preview.debt > 0 ? 1 + preview.debtDaysLeft : 0 };
-  }, [entries, calorieGoal, events, day]);
+  }, [totalsFor, calorieGoal, events, day]);
 
   // Tant qu'on est dans le tampon, il n'y a rien à rééquilibrer : le bloc ne
   // doit tout simplement pas exister, pas afficher un "0 kcal" déguisé.
@@ -79,9 +76,8 @@ export default function TodayScreen() {
 
   // Série de jours consécutifs dans l'objectif calories.
   const streak = useMemo(
-    () =>
-      calorieStreak((d) => totalsForDay(entries, d).kcal, calorieGoal, events, today()),
-    [entries, calorieGoal, events],
+    () => calorieStreak(totalsFor, calorieGoal, events, today()),
+    [totalsFor, calorieGoal, events],
   );
 
   // Événements à venir dont l'épargne n'a pas encore démarré.
@@ -101,12 +97,12 @@ export default function TodayScreen() {
       return {
         day: d,
         kcal: dayTotals.kcal,
-        goal: dailyGoal((dd) => totalsForDay(entries, dd).kcal, calorieGoal, events, d).goal,
+        goal: dailyGoal(totalsFor, calorieGoal, events, d).goal,
         hasEntries: dayTotals.kcal > 0,
         hasEvent: eventDays.has(d),
       };
     });
-  }, [entries, events, calorieGoal, day, eventDays]);
+  }, [entries, events, calorieGoal, day, eventDays, totalsFor]);
 
   // Journal découpé par repas, dans l'ordre de la journée.
   const meals = useMemo(
@@ -197,8 +193,16 @@ export default function TodayScreen() {
 
       <ProteinBar consumed={totals.protein} goal={proteinGoal} />
 
-      <SavingBanner adjustment={adjustment} day={day} upcoming={pendingEvents} />
-      <DebtBanner rebalance={rebalance} />
+      <SavingBanner
+        adjustment={adjustment}
+        day={day}
+        upcoming={pendingEvents}
+        frozen={debt > 0}
+        totalsFor={totalsFor}
+        baseGoal={calorieGoal}
+        events={events}
+      />
+      <DebtBanner rebalance={rebalance} pattern={pattern} />
 
       <View style={{ gap: Spacing.three }}>
         <SectionTitle>
