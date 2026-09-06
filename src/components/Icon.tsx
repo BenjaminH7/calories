@@ -25,9 +25,11 @@ type Props = {
   size?: number;
   color?: string;
   strokeWidth?: number;
+  /** Remplit la forme au lieu de la tracer (utilisé pour la flamme de série). */
+  filled?: boolean;
 };
 
-export function Icon({ name, size = 22, color, strokeWidth = 2 }: Props) {
+export function Icon({ name, size = 22, color, strokeWidth = 2, filled }: Props) {
   const t = useTheme();
   const stroke = color ?? t.text;
   const common = {
@@ -112,6 +114,7 @@ export function Icon({ name, size = 22, color, strokeWidth = 2 }: Props) {
         <Path
           d="M12 3s5.5 4.2 5.5 9a5.5 5.5 0 1 1-11 0c0-1.9 1-3.4 2-4.4.2 1.4 1 2.2 1.8 2.2 1.4 0 2-1.9 1.7-6.8z"
           {...common}
+          fill={filled ? stroke : 'none'}
         />
       )}
     </Svg>

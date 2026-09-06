@@ -12,7 +12,7 @@ import { WeekStrip, type DaySummary } from '@/components/WeekStrip';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { DayKey, daysBetween, humanDay, today, weekEndingAt } from '@/lib/date';
-import { effectiveCalorieGoal } from '@/lib/nutrition';
+import { calorieStreak, effectiveCalorieGoal } from '@/lib/nutrition';
 import { MEAL_EMOJI, MEAL_LABELS, MEAL_ORDER, UNIT_LABELS, type FoodEntry } from '@/store/types';
 import { entriesForDay, totalsForDay, useAppStore } from '@/store/useAppStore';
 
@@ -35,6 +35,13 @@ export default function TodayScreen() {
     [calorieGoal, events, day],
   );
   const eventDays = useMemo(() => new Set(events.map((e) => e.date)), [events]);
+
+  // Série de jours consécutifs dans l'objectif calories.
+  const streak = useMemo(
+    () =>
+      calorieStreak((d) => totalsForDay(entries, d).kcal, calorieGoal, events, today()),
+    [entries, calorieGoal, events],
+  );
 
   // Événements à venir dont l'épargne n'a pas encore démarré.
   const pendingEvents = useMemo(
@@ -99,18 +106,23 @@ export default function TodayScreen() {
               : `Objectif : ${goal} kcal · ${proteinGoal} g de protéines`}
           </Txt>
         </View>
-        <Pressable
-          onPress={() => setDay(today())}
-          disabled={day === today()}
-          style={{
-            paddingHorizontal: Spacing.four,
-            paddingVertical: Spacing.two,
-            borderRadius: Radius.pill,
-            backgroundColor: t.cardAlt,
-            opacity: day === today() ? 0 : 1,
-          }}>
-          <Txt variant="label">Aujourd&apos;hui</Txt>
-        </Pressable>
+        <Row gap={Spacing.two}>
+          {day !== today() ? (
+            <Pressable
+              onPress={() => setDay(today())}
+              style={({ pressed }) => ({
+                paddingHorizontal: Spacing.four,
+                paddingVertical: Spacing.two,
+                borderRadius: Radius.pill,
+                backgroundColor: t.cardAlt,
+                opacity: pressed ? 0.6 : 1,
+              })}>
+              <Txt variant="label">Aujourd&apos;hui</Txt>
+            </Pressable>
+          ) : null}
+
+          <StreakBadge streak={streak} />
+        </Row>
       </Row>
 
       <WeekStrip days={week} selected={day} onSelect={setDay} />
@@ -191,7 +203,7 @@ export default function TodayScreen() {
                     <Txt variant="heading" style={{ fontSize: 15 }}>
                       {Math.round(entry.kcal)} kcal
                     </Txt>
-                    <Txt variant="caption" color={t.protein}>
+                    <Txt variant="caption" muted>
                       {Math.round(entry.protein * 10) / 10} g prot.
                     </Txt>
                   </View>
@@ -216,6 +228,34 @@ function formatQuantity(entry: FoodEntry) {
   const unit = UNIT_LABELS[entry.unit];
   const plural = (entry.unit === 'piece' || entry.unit === 'serving') && entry.quantity > 1 ? 's' : '';
   return `${Math.round(entry.quantity * 10) / 10} ${unit}${plural}`;
+}
+
+/** Série de jours dans l'objectif. S'éteint en gris quand la série est à zéro. */
+function StreakBadge({ streak }: { streak: number }) {
+  const t = useTheme();
+  const alive = streak > 0;
+
+  return (
+    <View
+      accessibilityRole="text"
+      accessibilityLabel={
+        alive ? `Série de ${streak} jour${streak > 1 ? 's' : ''} dans l'objectif` : 'Aucune série en cours'
+      }
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.one,
+        paddingHorizontal: Spacing.three,
+        paddingVertical: Spacing.two,
+        borderRadius: Radius.pill,
+        backgroundColor: alive ? `${t.saving}22` : t.cardAlt,
+      }}>
+      <Icon name="flame" size={17} color={alive ? t.saving : t.textSecondary} filled={alive} />
+      <Txt variant="heading" style={{ fontSize: 15 }} color={alive ? t.saving : t.textSecondary}>
+        {streak}
+      </Txt>
+    </View>
+  );
 }
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {

@@ -119,6 +119,34 @@ export function adjustmentsFor(events: CalorieEvent[], day: DayKey): DayAdjustme
   };
 }
 
+/**
+ * Série de jours consécutifs où l'objectif calories a été tenu, en remontant
+ * depuis aujourd'hui. Une journée sans rien de consigné n'entre pas dans la
+ * série, mais le jour en cours ne la casse pas tant qu'il n'est pas terminé.
+ */
+export function calorieStreak(
+  totalsFor: (day: DayKey) => number,
+  baseGoal: number,
+  events: CalorieEvent[],
+  from: DayKey,
+): number {
+  const held = (day: DayKey) => {
+    const kcal = totalsFor(day);
+    return kcal > 0 && kcal <= effectiveCalorieGoal(baseGoal, events, day).goal;
+  };
+
+  let streak = held(from) ? 1 : 0;
+  let day = addDays(from, -1);
+
+  // Garde-fou : on ne remonte pas au-delà d'un an.
+  for (let i = 0; i < 366 && held(day); i += 1) {
+    streak += 1;
+    day = addDays(day, -1);
+  }
+
+  return streak;
+}
+
 /** Objectif calorique effectif du jour, épargne comprise. */
 export function effectiveCalorieGoal(
   baseGoal: number,
