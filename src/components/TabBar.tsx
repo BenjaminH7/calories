@@ -31,7 +31,9 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const renderTab = (routeName: string) => {
+  // `flex` permet d'équilibrer les deux moitiés autour du bouton central :
+  // 2 unités à gauche (deux onglets), 2 à droite (un onglet double largeur).
+  const renderTab = (routeName: string, flex = 1) => {
     const index = state.routes.findIndex((r) => r.name === routeName);
     if (index === -1) return null;
     const route = state.routes[index];
@@ -50,7 +52,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
             navigation.navigate(route.name, route.params);
           }
         }}
-        style={{ flex: 1, alignItems: 'center', gap: 3, paddingTop: Spacing.two }}>
+        style={{ flex, alignItems: 'center', gap: 3, paddingTop: Spacing.two }}>
         <Icon name={ICONS[routeName]} size={22} color={focused ? t.text : t.textSecondary} />
         <Txt variant="caption" color={focused ? t.text : t.textSecondary} style={{ fontSize: 10.5 }}>
           {LABELS[routeName]}
@@ -74,7 +76,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
       {renderTab('index')}
       {renderTab('events')}
 
-      <View style={{ width: 76, alignItems: 'center' }}>
+      <View style={{ width: 72, alignItems: 'center' }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Ajouter un aliment"
@@ -101,7 +103,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         </Pressable>
       </View>
 
-      {renderTab('settings')}
+      {renderTab('settings', 2)}
     </View>
   );
 }

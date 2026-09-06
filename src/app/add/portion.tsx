@@ -1,11 +1,13 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/Icon';
 import { MealPicker } from '@/components/MealPicker';
 import { ModalHeader } from '@/components/ModalHeader';
+import { NumberBox, parseNumber } from '@/components/NumberBox';
 import { QuantityField } from '@/components/QuantityField';
 import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -61,6 +63,14 @@ export default function PortionScreen() {
   const [loading, setLoading] = useState(Boolean(params.barcode));
   const [error, setError] = useState<string | null>(null);
 
+  // Correction des valeurs de référence : OpenFoodFacts est contributif, les
+  // chiffres sont parfois faux ou absents. `corrected` bascule dès que
+  // l'utilisateur touche un champ.
+  const [showCorrection, setShowCorrection] = useState(false);
+  const [corrected, setCorrected] = useState(false);
+  const [kcalRef, setKcalRef] = useState('');
+  const [proteinRef, setProteinRef] = useState('');
+
   // Entrée existante (modification ou ré-ajout) : tout vient du store.
   useEffect(() => {
     if (!sourceEntry) return;
@@ -76,6 +86,8 @@ export default function PortionScreen() {
     });
     setQuantity(sourceEntry.quantity);
     setUnit(sourceEntry.unit);
+    setKcalRef(String(sourceEntry.basis.kcal));
+    setProteinRef(String(sourceEntry.basis.protein));
     // On ne reprend le repas que s'il s'agit vraiment de la même entrée ;
     // un ré-ajout part du repas courant.
     if (params.entryId) setMeal(sourceEntry.meal);
@@ -111,6 +123,20 @@ export default function PortionScreen() {
         });
         setUnit(startUnit);
         setQuantity(product.servingSize ?? 100);
+
+        // Si ce code-barres a déjà été corrigé, on repart de la correction
+        // plutôt que des valeurs OpenFoodFacts.
+        const prior = [...useAppStore.getState().entries]
+          .filter((e) => e.barcode === product.barcode && e.basis.per === 100)
+          .sort((a, b) => b.createdAt - a.createdAt)[0];
+        const differs =
+          prior &&
+          (prior.basis.kcal !== product.kcalPer100 || prior.basis.protein !== product.proteinPer100);
+
+        setKcalRef(String(differs ? prior.basis.kcal : product.kcalPer100));
+        setProteinRef(String(differs ? prior.basis.protein : product.proteinPer100));
+        setCorrected(Boolean(differs));
+        setShowCorrection(Boolean(differs));
       })
       .catch(() => !cancelled && setError('réseau'))
       .finally(() => !cancelled && setLoading(false));
@@ -122,10 +148,31 @@ export default function PortionScreen() {
 
   const basis = useMemo<NutritionBasis | null>(() => {
     if (!loaded) return null;
-    if (loaded.product) return basisFor(loaded.product, unit);
+
+    if (loaded.product) {
+      // La correction porte toujours sur les valeurs pour 100 g/ml : la
+      // conversion en portion reste donc juste.
+      const product = corrected
+        ? { ...loaded.product, kcalPer100: parseNumber(kcalRef), proteinPer100: parseNumber(proteinRef) }
+        : loaded.product;
+      return basisFor(product, unit);
+    }
+
     // Entrée manuelle ou récente : on garde la base, seule l'unité d'affichage change.
-    return { ...loaded.basis, unit: loaded.basis.per === 1 ? loaded.basis.unit : unit };
-  }, [loaded, unit]);
+    return {
+      kcal: corrected ? parseNumber(kcalRef) : loaded.basis.kcal,
+      protein: corrected ? parseNumber(proteinRef) : loaded.basis.protein,
+      per: loaded.basis.per,
+      unit: loaded.basis.per === 1 ? loaded.basis.unit : unit,
+    };
+  }, [loaded, unit, corrected, kcalRef, proteinRef]);
+
+  /** Unité de référence de la correction : toujours la base 100 g/ml du produit. */
+  const referenceLabel = loaded?.product
+    ? `pour 100 ${UNIT_LABELS[loaded.product.baseUnit]}`
+    : loaded?.basis.per === 1
+      ? `par ${UNIT_LABELS[loaded.basis.unit]}`
+      : `pour 100 ${UNIT_LABELS[unit]}`;
 
   const totals = basis ? totalsFor(basis, quantity) : { kcal: 0, protein: 0 };
 
@@ -200,7 +247,7 @@ export default function PortionScreen() {
             onPress={() =>
               router.replace({
                 pathname: '/add/manual',
-                params: { day, barcode: params.barcode ?? '' },
+                params: { day, meal, barcode: params.barcode ?? '' },
               })
             }
           />
@@ -246,6 +293,74 @@ export default function PortionScreen() {
               </Txt>
             </View>
           </Row>
+
+          <Pressable
+            onPress={() => setShowCorrection((v) => !v)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: Spacing.two,
+              opacity: pressed ? 0.6 : 1,
+            })}>
+            <Icon name="pencil" size={14} color={corrected ? t.saving : t.textSecondary} />
+            <Txt variant="label" color={corrected ? t.saving : t.textSecondary}>
+              {corrected ? 'Valeurs corrigées' : 'Ces valeurs sont fausses ?'}
+            </Txt>
+            <Icon
+              name={showCorrection ? 'close' : 'chevronRight'}
+              size={13}
+              color={t.textSecondary}
+            />
+          </Pressable>
+
+          {showCorrection && (
+            <View style={{ gap: Spacing.three }}>
+              <Txt variant="caption" muted>
+                OpenFoodFacts est alimenté par ses contributeurs. Recopie l&apos;étiquette{' '}
+                {referenceLabel} si elle ne correspond pas.
+              </Txt>
+              <Row gap={Spacing.three} style={{ alignItems: 'flex-start' }}>
+                <NumberBox
+                  label="Calories"
+                  suffix="kcal"
+                  size={22}
+                  value={kcalRef}
+                  onChangeText={(v) => {
+                    setKcalRef(v);
+                    setCorrected(true);
+                  }}
+                />
+                <NumberBox
+                  label="Protéines"
+                  suffix="g"
+                  size={22}
+                  color={t.protein}
+                  value={proteinRef}
+                  onChangeText={(v) => {
+                    setProteinRef(v);
+                    setCorrected(true);
+                  }}
+                />
+              </Row>
+              {corrected ? (
+                <Pressable
+                  onPress={() => {
+                    setCorrected(false);
+                    if (loaded.product) {
+                      setKcalRef(String(loaded.product.kcalPer100));
+                      setProteinRef(String(loaded.product.proteinPer100));
+                    } else {
+                      setKcalRef(String(loaded.basis.kcal));
+                      setProteinRef(String(loaded.basis.protein));
+                    }
+                  }}>
+                  <Txt variant="label" color={t.textSecondary}>
+                    Revenir aux valeurs d&apos;origine
+                  </Txt>
+                </Pressable>
+              ) : null}
+            </View>
+          )}
         </Card>
 
         <Card style={{ gap: Spacing.four }}>
