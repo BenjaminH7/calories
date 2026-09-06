@@ -4,19 +4,60 @@ import { Pressable, View } from 'react-native';
 import { Row, Txt } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DayKey, daysBetween, humanDay } from '@/lib/date';
-import { dailySaving, savedSoFar, type DayAdjustment } from '@/lib/nutrition';
+import { DayKey, daysBetween, humanDay, shortDate } from '@/lib/date';
+import { dailySaving, savedSoFar, savingStart, type DayAdjustment } from '@/lib/nutrition';
+import type { CalorieEvent } from '@/store/types';
 
 /**
  * Bandeau affiché sur l'accueil : soit « tu épargnes X kcal aujourd'hui »,
  * soit « c'est le jour J, +X kcal débloquées ».
  */
-export function SavingBanner({ adjustment, day }: { adjustment: DayAdjustment; day: DayKey }) {
+export function SavingBanner({
+  adjustment,
+  day,
+  upcoming,
+}: {
+  adjustment: DayAdjustment;
+  day: DayKey;
+  /** Événements créés dont la fenêtre d'épargne n'a pas encore commencé. */
+  upcoming?: CalorieEvent[];
+}) {
   const t = useTheme();
   const router = useRouter();
 
   const event = adjustment.happeningToday[0] ?? adjustment.savingFor[0];
-  if (!event) return null;
+
+  // Rien ne se prélève aujourd'hui : on annonce quand même l'échéance, sinon
+  // l'utilisateur croit que son épargne ne fait rien.
+  if (!event) {
+    const next = upcoming?.[0];
+    if (!next) return null;
+    return (
+      <Pressable
+        onPress={() => router.push('/(tabs)/events')}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: Spacing.three,
+          backgroundColor: t.card,
+          borderColor: t.border,
+          borderWidth: 1,
+          borderRadius: Radius.lg,
+          padding: Spacing.four,
+          opacity: pressed ? 0.85 : 1,
+        })}>
+        <Txt variant="heading">{next.emoji}</Txt>
+        <View style={{ flex: 1 }}>
+          <Txt variant="label" numberOfLines={1}>
+            {next.name} · {humanDay(next.date)}
+          </Txt>
+          <Txt variant="caption" muted>
+            Épargne à partir du {shortDate(savingStart(next))} · −{dailySaving(next)} kcal / jour
+          </Txt>
+        </View>
+      </Pressable>
+    );
+  }
 
   const isEventDay = adjustment.happeningToday.length > 0;
   const daysLeft = daysBetween(day, event.date);

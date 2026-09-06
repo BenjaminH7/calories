@@ -8,7 +8,7 @@ import { Button, Card, Row, SectionTitle, Txt } from '@/components/ui';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { daysBetween, humanDay, shortDate, today } from '@/lib/date';
-import { dailySaving, savedSoFar } from '@/lib/nutrition';
+import { adjustmentsFor, dailySaving, savedSoFar, savingStart } from '@/lib/nutrition';
 import type { CalorieEvent } from '@/store/types';
 import { pastEvents, upcomingEvents, useAppStore } from '@/store/useAppStore';
 
@@ -24,8 +24,13 @@ export default function EventsScreen() {
 
   const upcoming = useMemo(() => upcomingEvents(events, now), [events, now]);
   const past = useMemo(() => pastEvents(events, now), [events, now]);
-  const savedToday = useMemo(
-    () => upcoming.reduce((sum, e) => (daysBetween(now, e.date) >= 1 ? sum + dailySaving(e) : sum), 0),
+  // Même calcul que l'accueil : seuls les événements dont la fenêtre d'épargne
+  // a commencé prélèvent quelque chose aujourd'hui.
+  const savedToday = useMemo(() => adjustmentsFor(events, now).saved, [events, now]);
+
+  // Événements créés mais dont l'épargne n'a pas encore démarré.
+  const notStarted = useMemo(
+    () => upcoming.filter((e) => daysBetween(now, e.date) > e.spreadDays),
     [upcoming, now],
   );
 
@@ -68,7 +73,11 @@ export default function EventsScreen() {
         <Txt variant="caption" muted>
           {savedToday > 0
             ? `Ton objectif de base (${calorieGoal} kcal) est réduit tant que l'épargne tourne.`
-            : 'Aucune épargne en cours. Crée un événement pour commencer.'}
+            : notStarted.length > 0
+              ? `L'épargne n'a pas encore démarré : elle commencera le ${shortDate(
+                  savingStart(notStarted[0]),
+                )}, ${notStarted[0].spreadDays} jours avant « ${notStarted[0].name} ».`
+              : 'Aucune épargne en cours. Crée un événement pour commencer.'}
         </Txt>
       </Card>
 
@@ -199,7 +208,11 @@ function EventCard({ event, onDelete }: { event: CalorieEvent; onDelete: () => v
 
       {!isToday && (
         <Txt variant="caption" muted>
-          Répartition sur {event.spreadDays} jour{event.spreadDays > 1 ? 's' : ''} avant l&apos;événement.
+          {savingActive
+            ? `Répartition sur ${event.spreadDays} jour${event.spreadDays > 1 ? 's' : ''} avant l'événement.`
+            : `Ton objectif ne bougera qu'à partir du ${shortDate(savingStart(event))}, soit ${
+                event.spreadDays
+              } jour${event.spreadDays > 1 ? 's' : ''} avant.`}
         </Txt>
       )}
     </Card>

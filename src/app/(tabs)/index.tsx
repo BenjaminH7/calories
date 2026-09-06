@@ -11,7 +11,7 @@ import { Card, Divider, Row, SectionTitle, Txt } from '@/components/ui';
 import { WeekStrip, type DaySummary } from '@/components/WeekStrip';
 import { Radius, Spacing, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DayKey, humanDay, today, weekEndingAt } from '@/lib/date';
+import { DayKey, daysBetween, humanDay, today, weekEndingAt } from '@/lib/date';
 import { effectiveCalorieGoal } from '@/lib/nutrition';
 import { MEAL_EMOJI, MEAL_LABELS, MEAL_ORDER, UNIT_LABELS, type FoodEntry } from '@/store/types';
 import { entriesForDay, totalsForDay, useAppStore } from '@/store/useAppStore';
@@ -35,6 +35,15 @@ export default function TodayScreen() {
     [calorieGoal, events, day],
   );
   const eventDays = useMemo(() => new Set(events.map((e) => e.date)), [events]);
+
+  // Événements à venir dont l'épargne n'a pas encore démarré.
+  const pendingEvents = useMemo(
+    () =>
+      events
+        .filter((e) => e.date > day && daysBetween(day, e.date) > e.spreadDays)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [events, day],
+  );
 
   // Bilan des 7 derniers jours : consommé vs objectif ajusté.
   const week = useMemo<DaySummary[]>(() => {
@@ -124,7 +133,7 @@ export default function TodayScreen() {
 
       <ProteinBar consumed={totals.protein} goal={proteinGoal} />
 
-      <SavingBanner adjustment={adjustment} day={day} />
+      <SavingBanner adjustment={adjustment} day={day} upcoming={pendingEvents} />
 
       <View style={{ gap: Spacing.three }}>
         <SectionTitle>
